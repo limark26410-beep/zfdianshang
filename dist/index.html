@@ -1,0 +1,1379 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI六步法 · 选品搜索引擎 v0.3 · 真实数据</title>
+<style>
+:root {
+  --bg: #f5f5f0;
+  --bg-card: #ffffff;
+  --bg-sidebar: #1a1a2e;
+  --text: #2d2d2d;
+  --text-light: #6b6b6b;
+  --text-sidebar: #c8c8d4;
+  --accent: #2563eb;
+  --accent-light: #dbeafe;
+  --success: #16a34a;
+  --success-bg: #dcfce7;
+  --warning: #ea580c;
+  --warning-bg: #fff7ed;
+  --danger: #dc2626;
+  --danger-bg: #fef2f2;
+  --border: #e5e5e0;
+  --shadow: 0 1px 3px rgba(0,0,0,0.06);
+  --shadow-md: 0 4px 12px rgba(0,0,0,0.08);
+  --radius: 10px;
+  --radius-sm: 6px;
+  --transition: 0.2s ease;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  line-height: 1.6;
+  display: flex;
+  min-height: 100vh;
+}
+
+/* Sidebar */
+.sidebar {
+  width: 240px;
+  background: var(--bg-sidebar);
+  color: var(--text-sidebar);
+  padding: 24px 0;
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  overflow-y: auto;
+}
+.sidebar-logo { padding: 0 20px 24px; border-bottom: 1px solid rgba(255,255,255,0.08); margin-bottom: 16px; }
+.sidebar-logo h1 { font-size: 16px; font-weight: 700; color: #fff; letter-spacing: -0.3px; }
+.sidebar-logo span { font-size: 11px; color: #7c7c9a; display: block; margin-top: 4px; }
+.sidebar-section { padding: 0 20px; margin-bottom: 12px; }
+.sidebar-section h3 { font-size: 10px; text-transform: uppercase; letter-spacing: 1px; color: #5c5c7a; margin-bottom: 8px; }
+.category-list { list-style: none; }
+.category-list li {
+  padding: 8px 12px; border-radius: var(--radius-sm); cursor: pointer;
+  font-size: 14px; transition: var(--transition); margin-bottom: 2px;
+}
+.category-list li:hover { background: rgba(255,255,255,0.08); color: #fff; }
+.category-list li.active { background: var(--accent); color: #fff; font-weight: 600; }
+.category-list li .badge { float: right; font-size: 10px; background: rgba(255,255,255,0.15); padding: 1px 6px; border-radius: 8px; }
+.sidebar-footer { margin-top: auto; padding: 16px 20px; font-size: 11px; color: #5c5c7a; border-top: 1px solid rgba(255,255,255,0.08); }
+
+/* Main */
+.main { flex: 1; padding: 32px; max-width: 1200px; overflow-y: auto; height: 100vh; }
+
+/* Top Bar */
+.top-bar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; flex-wrap: wrap; gap: 12px; }
+.top-bar h2 { font-size: 22px; font-weight: 700; letter-spacing: -0.5px; }
+.status-badge { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--text-light); }
+.status-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--success); }
+
+/* Search Panel */
+.search-panel {
+  background: var(--bg-card); border-radius: var(--radius); padding: 24px;
+  box-shadow: var(--shadow); border: 1px solid var(--border); margin-bottom: 24px;
+}
+.search-panel h3 { font-size: 16px; margin-bottom: 16px; display: flex; align-items: center; gap: 8px; }
+.search-row { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 12px; align-items: flex-end; }
+.search-row .form-group { flex: 1; min-width: 150px; }
+.form-group label { display: block; font-size: 12px; font-weight: 600; color: var(--text-light); margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.5px; }
+.form-group input, .form-group select, .form-group textarea {
+  width: 100%; padding: 10px 12px; border: 1px solid var(--border);
+  border-radius: var(--radius-sm); font-size: 14px; font-family: inherit;
+  transition: var(--transition); background: #fafaf7;
+}
+.form-group input:focus, .form-group select:focus, .form-group textarea:focus {
+  outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-light); background: #fff;
+}
+.btn {
+  display: inline-flex; align-items: center; gap: 6px; padding: 10px 20px;
+  border-radius: var(--radius-sm); font-size: 14px; font-weight: 600;
+  cursor: pointer; border: none; transition: var(--transition); font-family: inherit;
+}
+.btn-primary { background: var(--accent); color: #fff; }
+.btn-primary:hover { background: #1d4ed8; }
+.btn-outline { background: #fff; color: var(--accent); border: 1px solid var(--accent); }
+.btn-outline:hover { background: var(--accent-light); }
+.btn-success { background: var(--success); color: #fff; }
+.btn-success:hover { background: #15803d; }
+.btn-sm { padding: 6px 12px; font-size: 12px; }
+.btn-group { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 8px; }
+
+/* Keywords display */
+.keywords-display { margin-top: 12px; display: flex; flex-wrap: wrap; gap: 6px; }
+.platform-chip {
+  display: inline-flex; align-items: center; gap: 4px; padding: 4px 10px;
+  border-radius: 14px; font-size: 12px; font-weight: 500;
+  background: #f0f0eb; color: var(--text-light);
+}
+.platform-chip.active { background: var(--accent-light); color: var(--accent); font-weight: 600; }
+.keyword-tag {
+  display: inline-block; padding: 3px 10px; border-radius: 12px;
+  font-size: 12px; background: #e8f5e9; color: #2e7d32;
+  cursor: pointer; transition: var(--transition);
+}
+.keyword-tag:hover { background: #c8e6c9; }
+
+/* Search Progress */
+.search-progress { display: none; margin-top: 16px; padding: 12px 16px; background: var(--accent-light); border-radius: var(--radius-sm); }
+.search-progress .platform-row { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; font-size: 13px; }
+.search-progress .search-spinner { width: 14px; height: 14px; border: 2px solid #ccc; border-top-color: var(--accent); border-radius: 50%; animation: spin 0.6s linear infinite; display: inline-block; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* Stats Bar */
+.stats-bar {
+  display: none; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 12px; margin-bottom: 20px;
+}
+.stat-card {
+  background: var(--bg-card); border-radius: var(--radius); padding: 16px;
+  box-shadow: var(--shadow); border: 1px solid var(--border); text-align: center;
+}
+.stat-card .stat-num { font-size: 32px; font-weight: 800; letter-spacing: -1px; }
+.stat-card .stat-label { font-size: 12px; color: var(--text-light); margin-top: 2px; }
+.stat-card .stat-num.high { color: var(--success); }
+.stat-card .stat-num.mid { color: var(--warning); }
+.stat-card .stat-num.low { color: var(--danger); }
+
+/* Product Result Cards */
+.results-area { display: grid; gap: 12px; }
+.product-card {
+  background: var(--bg-card); border-radius: var(--radius);
+  box-shadow: var(--shadow); border: 2px solid var(--border);
+  overflow: hidden; transition: var(--transition); cursor: pointer;
+}
+.product-card:hover { box-shadow: var(--shadow-md); }
+.product-card.top-pick { border-color: var(--success); }
+.product-card.good { border-color: #86efac; }
+.product-card.test { border-color: #fdba74; }
+.product-card.skip { border-color: #fca5a5; }
+
+.product-card-header {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 16px 20px; gap: 12px; flex-wrap: wrap;
+}
+.product-rank { font-size: 20px; font-weight: 800; color: var(--text-light); min-width: 30px; }
+.product-info { flex: 1; min-width: 250px; }
+.product-name { font-size: 16px; font-weight: 700; margin-bottom: 2px; }
+.product-meta { font-size: 12px; color: var(--text-light); display: flex; gap: 16px; flex-wrap: wrap; }
+.product-meta span { display: flex; align-items: center; gap: 4px; }
+.product-score-box { text-align: center; min-width: 70px; }
+.score-num { font-size: 28px; font-weight: 800; letter-spacing: -1px; }
+.score-label { font-size: 11px; color: var(--text-light); }
+.score-num.high { color: var(--success); }
+.score-num.mid { color: var(--warning); }
+.score-num.low { color: var(--danger); }
+.product-verdict { min-width: 80px; text-align: center; }
+.verdict-tag {
+  display: inline-block; padding: 4px 12px; border-radius: 12px;
+  font-size: 12px; font-weight: 700;
+}
+.verdict-tag.enter { background: var(--success-bg); color: var(--success); }
+.verdict-tag.test { background: var(--warning-bg); color: var(--warning); }
+.verdict-tag.skip { background: var(--danger-bg); color: var(--danger); }
+
+/* Product Detail Panel */
+.product-detail {
+  display: none; padding: 0 20px 20px; border-top: 1px solid var(--border);
+}
+.product-detail.open { display: block; }
+
+/* Six-step mini cards inside detail */
+.mini-steps { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 16px; }
+@media (max-width: 768px) { .mini-steps { grid-template-columns: 1fr; } }
+.mini-step {
+  background: #fafaf7; border-radius: var(--radius-sm); padding: 14px;
+  border: 1px solid var(--border);
+}
+.mini-step h5 { font-size: 13px; margin-bottom: 6px; color: var(--accent); }
+.mini-step p, .mini-step li { font-size: 12px; color: var(--text-light); }
+.mini-step ul { padding-left: 16px; }
+.mini-step table { width: 100%; font-size: 12px; border-collapse: collapse; }
+.mini-step th, .mini-step td { padding: 4px 8px; border: 1px solid var(--border); text-align: left; }
+.mini-step th { background: #f0f0eb; }
+
+/* Three Gates in detail */
+.detail-gates { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; margin-top: 16px; }
+@media (max-width: 768px) { .detail-gates { grid-template-columns: 1fr; } }
+.detail-gate {
+  text-align: center; padding: 14px; border-radius: var(--radius-sm); border: 2px solid var(--border);
+}
+.detail-gate.pass { border-color: var(--success); background: var(--success-bg); }
+.detail-gate.fail { border-color: var(--danger); background: var(--danger-bg); }
+.detail-gate h5 { font-size: 13px; margin-bottom: 4px; }
+.detail-gate .gate-icon { font-size: 24px; }
+
+/* Detail decision */
+.detail-decision {
+  margin-top: 16px; padding: 16px 20px; border-radius: var(--radius-sm);
+  font-weight: 700; font-size: 15px; display: flex; align-items: center; gap: 10px;
+}
+.detail-decision.enter { background: var(--success-bg); color: var(--success); border: 1px solid var(--success); }
+.detail-decision.test { background: var(--warning-bg); color: var(--warning); border: 1px solid var(--warning); }
+.detail-decision.pause { background: var(--danger-bg); color: var(--danger); border: 1px solid var(--danger); }
+
+/* Empty State */
+.empty-state { text-align: center; padding: 60px 20px; color: var(--text-light); }
+.empty-state .icon { font-size: 48px; margin-bottom: 12px; }
+.empty-state h3 { font-size: 18px; color: var(--text); margin-bottom: 6px; }
+.empty-state p { font-size: 14px; margin-bottom: 4px; }
+
+/* Toast */
+.toast {
+  position: fixed; bottom: 24px; right: 24px;
+  background: #1a1a2e; color: #fff; padding: 12px 20px;
+  border-radius: var(--radius-sm); font-size: 13px;
+  box-shadow: var(--shadow-md); opacity: 0; transform: translateY(10px);
+  transition: all 0.3s ease; z-index: 1000;
+}
+.toast.show { opacity: 1; transform: translateY(0); }
+
+/* Action buttons in detail */
+.detail-actions { display: flex; gap: 8px; margin-top: 16px; }
+
+/* Responsive */
+@media (max-width: 768px) {
+  .sidebar { display: none; }
+  .main { padding: 16px; }
+  .search-row { flex-direction: column; }
+}
+
+/* Score badges row */
+.score-badge {
+  display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px;
+  border-radius: 10px; font-size: 11px; font-weight: 600;
+}
+.score-badge.a { background: #dcfce7; color: #16a34a; }
+.score-badge.b { background: #dbeafe; color: #2563eb; }
+.score-badge.c { background: #fff7ed; color: #ea580c; }
+.score-badge.d { background: #fef2f2; color: #dc2626; }
+
+/* Manual Add Modal */
+.modal-overlay {
+  display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.4);
+  z-index: 999; align-items: center; justify-content: center;
+  backdrop-filter: blur(2px);
+}
+.modal-overlay.open { display: flex; }
+.modal-box {
+  background: var(--bg-card); border-radius: var(--radius); width: 90%; max-width: 600px;
+  max-height: 85vh; overflow-y: auto; box-shadow: 0 20px 60px rgba(0,0,0,0.2);
+}
+.modal-header {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 20px 24px; border-bottom: 1px solid var(--border);
+}
+.modal-header h3 { font-size: 16px; }
+.modal-close {
+  width: 32px; height: 32px; border-radius: 50%; border: none; background: #f0f0eb;
+  font-size: 18px; cursor: pointer; display: flex; align-items: center; justify-content: center;
+  transition: var(--transition);
+}
+.modal-close:hover { background: #e0e0d8; }
+.modal-body { padding: 20px 24px; }
+.modal-footer {
+  padding: 16px 24px; border-top: 1px solid var(--border);
+  display: flex; justify-content: flex-end; gap: 10px;
+}
+.modal-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+@media (max-width: 500px) { .modal-grid { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+
+<!-- Sidebar -->
+<nav class="sidebar">
+  <div class="sidebar-logo">
+    <h1>🔍 AI选品搜索引擎</h1>
+    <span>品类选品 · 六步法评分 · v0.3 · 真实搜索数据</span>
+  </div>
+  <div class="sidebar-section">
+    <h3>品类配置</h3>
+    <ul class="category-list" id="categoryList">
+      <li class="active" data-category="白酒">🍶 白酒</li>
+      <li data-category="植物个护">🌿 植物个护/美妆</li>
+      <li data-category="茶叶">🍵 茶叶</li>
+      <li data-category="山货干货">🥜 山货干货</li>
+    </ul>
+  </div>
+  <div class="sidebar-section">
+    <h3>搜索数据源</h3>
+    <ul class="category-list">
+      <li>📊 抖音 / 蝉妈妈</li>
+      <li>📕 小红书 / 灰豚</li>
+      <li>📱 视频号 / 微信</li>
+      <li>🛒 淘宝 / 京东 / 1688</li>
+      <li>🎵 快手 / 磁力金牛</li>
+      <li>🔍 百度 / 搜索指数</li>
+      <li>🏢 企查查 / 天眼查</li>
+    </ul>
+  </div>
+  <div class="sidebar-footer">
+    输入品类 → 全网搜索<br>自动评分 → 排序筛选
+  </div>
+</nav>
+
+<!-- Main -->
+<main class="main">
+  <div class="top-bar">
+    <h2>品类选品搜索引擎</h2>
+    <div class="status-badge">
+      <span class="status-dot" id="statusDot"></span>
+      <span id="engineStatus">选择品类，启动全网选品搜索</span>
+      <span id="bridgeStatus" style="margin-left:10px;font-size:11px;padding:2px 8px;border-radius:12px;background:#fef2f2;color:#dc2626;" title="桥接服务连接状态">⚡离线模式</span>
+    </div>
+  </div>
+
+  <!-- Search Panel -->
+  <div class="search-panel" id="searchPanel">
+    <h3>🎯 <span id="currentCatLabel">白酒</span> · 选品搜索</h3>
+    <div class="search-row">
+      <div class="form-group">
+        <label>目标价格带</label>
+        <select id="priceRange">
+          <option value="all">不限</option>
+          <option value="0-99">百元以下</option>
+          <option value="100-199" selected>100-199元</option>
+          <option value="200-499">200-499元</option>
+          <option value="500+">500元以上</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>产地偏好</label>
+        <input type="text" id="originPref" placeholder="如：四川、贵州、新疆...">
+      </div>
+      <div class="form-group">
+        <label>搜索平台数</label>
+        <select id="platformCount">
+          <option value="3">3个平台（快速）</option>
+          <option value="5" selected>5个平台（均衡）</option>
+          <option value="7">7个平台（全面）</option>
+        </select>
+      </div>
+    </div>
+
+    <!-- Generated Keywords -->
+    <div class="keywords-display" id="keywordsDisplay">
+      <span style="font-size:12px;color:var(--text-light);margin-right:6px;">搜索词：</span>
+    </div>
+
+    <div class="btn-group">
+      <button class="btn btn-primary" onclick="startSearch()">🔍 全网选品搜索</button>
+      <button class="btn btn-success" onclick="loadSampleResults()">📋 加载示例结果</button>
+      <button class="btn btn-outline" onclick="showManualAdd()">✚ 手动添加产品</button>
+      <button class="btn btn-outline btn-sm" onclick="resetSearch()">🔄 重置</button>
+    </div>
+
+    <!-- Search Progress -->
+    <div class="search-progress" id="searchProgress">
+      <div class="platform-row"><span class="search-spinner"></span> 正在搜索：<span id="progressText">生成搜索方案...</span></div>
+    </div>
+  </div>
+
+  <!-- Stats Bar -->
+  <div class="stats-bar" id="statsBar">
+    <div class="stat-card"><div class="stat-num" id="statTotal">0</div><div class="stat-label">搜索到产品</div></div>
+    <div class="stat-card"><div class="stat-num high" id="statHigh">0</div><div class="stat-label">推荐进入（85+分）</div></div>
+    <div class="stat-card"><div class="stat-num mid" id="statMid">0</div><div class="stat-label">建议测试（70-84分）</div></div>
+    <div class="stat-card"><div class="stat-num low" id="statLow">0</div><div class="stat-label">不推荐（&lt;70分）</div></div>
+  </div>
+
+  <!-- Results -->
+  <div class="results-area" id="resultsArea">
+    <div class="empty-state">
+      <div class="icon">🔍</div>
+      <h3>输入品类，启动全网选品搜索</h3>
+      <p>AI搜索引擎将根据品类配置规则，从多个平台搜索候选产品</p>
+      <p style="font-size:12px;color:var(--text-light);margin-top:8px;">自动按选品维度评分排序，70分以上进入候选</p>
+    </div>
+  </div>
+
+  <!-- Manual Add Modal -->
+  <div class="modal-overlay" id="manualAddModal" onclick="closeModal(event)">
+    <div class="modal-box" onclick="event.stopPropagation()">
+      <div class="modal-header">
+        <h3>✚ 手动添加产品</h3>
+        <button class="modal-close" onclick="closeModal()">&times;</button>
+      </div>
+      <div class="modal-body">
+        <p style="font-size:13px;color:var(--text-light);margin-bottom:16px;">
+          填写产品信息后，系统将按当前品类「<strong id="modalCatName">白酒</strong>」的选品规则自动评分。
+        </p>
+        <div class="modal-grid">
+          <div class="form-group">
+            <label>产品名称 <span style="color:var(--danger)">*</span></label>
+            <input type="text" id="manualName" placeholder="如：北门曲酒1955">
+          </div>
+          <div class="form-group">
+            <label>品牌 <span style="color:var(--danger)">*</span></label>
+            <input type="text" id="manualBrand" placeholder="如：北门酒厂">
+          </div>
+          <div class="form-group">
+            <label>规格</label>
+            <input type="text" id="manualSpec" placeholder="如：500ml 42°">
+          </div>
+          <div class="form-group">
+            <label>产地 <span style="color:var(--danger)">*</span></label>
+            <input type="text" id="manualOrigin" placeholder="如：贵州遵义">
+          </div>
+          <div class="form-group">
+            <label>售价(元) <span style="color:var(--danger)">*</span></label>
+            <input type="number" id="manualPrice" placeholder="如：99" step="0.01" min="0">
+          </div>
+          <div class="form-group">
+            <label>供货价(元) <span style="color:var(--danger)">*</span></label>
+            <input type="number" id="manualCost" placeholder="如：45" step="0.01" min="0">
+          </div>
+          <div class="form-group" style="grid-column: 1 / -1;">
+            <label>产品描述 <span style="color:var(--danger)">*</span></label>
+            <textarea id="manualDesc" rows="3" placeholder="产地故事、工艺特点、资质情况、用户口碑等..."></textarea>
+          </div>
+          <div class="form-group">
+            <label>平台评分 (1-5)</label>
+            <input type="number" id="manualStar" placeholder="如：4.5" step="0.1" min="0" max="5" value="4.5">
+          </div>
+          <div class="form-group">
+            <label>月销量估计</label>
+            <input type="number" id="manualSales" placeholder="如：2000" min="0" value="0">
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-outline" onclick="closeModal()">取消</button>
+        <button class="btn btn-primary" onclick="submitManualProduct()">✅ 添加并评分</button>
+      </div>
+    </div>
+  </div>
+
+</main>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ===========================
+// 品类配置数据（同v0.1）
+// ===========================
+const CATEGORY_CONFIGS = {
+  '白酒': {
+    name: '白酒', icon: '🍶',
+    scoring: [
+      { name: '地方特色', weight: 20 },
+      { name: '资质合规', weight: 25 },
+      { name: '利润空间', weight: 20 },
+      { name: '供应稳定性', weight: 15 },
+      { name: '内容素材', weight: 15 },
+      { name: '可复制性', weight: 5 }
+    ],
+    passLine: 70,
+    priceFilter: { min: 49, max: 599, ideal: [99, 299] },
+    compliance: {
+      bannedWords: ['特供','专供','内供','军供'],
+      forbidden: ['不得诱导饮酒','不得出现饮酒动作','不得面向未成年人'],
+      canSay: ['地方故事','酒厂历史','工艺传承','香型知识','送礼场景','家宴搭配'],
+      cannotSay: ['饮酒动作','劝酒拼酒','喝酒成功','未成年人画面']
+    },
+    platforms: {
+      '抖音': { required: '酒类报白+品牌授权', difficulty: '高', searchTerms: ['地方白酒','纯粮酒','口粮酒推荐'] },
+      '小红书': { required: '酒类准入+品牌授权', difficulty: '高', searchTerms: ['小众白酒推荐','好喝不贵的白酒','地方特产酒'] },
+      '视频号': { required: '企业主体+50万注册+品牌授权', difficulty: '极高', searchTerms: ['送礼白酒','企业用酒','家宴酒'] },
+      '淘宝': { required: '食品经营许可', difficulty: '中', searchTerms: ['地方白酒 产地直发','小众白酒 纯粮','口粮酒 整箱'] },
+      '京东': { required: '食品经营许可', difficulty: '中', searchTerms: ['地方名酒','纯粮酿造白酒','产地直供白酒'] },
+      '1688': { required: '食品经营许可', difficulty: '低', searchTerms: ['白酒批发 地方特色','纯粮酒 厂家直供','小品牌白酒 代发'] },
+      '百度': { required: '无', difficulty: '低', searchTerms: ['地方小众白酒品牌','哪个地方的白酒好喝','口碑好的地方酒'] },
+      '快手': { required: '快手小店+食品经营许可', difficulty: '中', searchTerms: ['地方白酒直播','纯粮酒老铁推荐','良心口粮酒'] }
+    },
+    targetUsers: '30-50岁男性、本地情怀、品质口粮、企业采购',
+    profitModel: { grossMargin: '40-60%', netMargin: '10-25%' },
+    tools: { search: '灰豚/千瓜/蝉妈妈', verify: '企查查/天眼查', content: '秘塔写作猫/剪映' }
+  },
+  '植物个护': {
+    name: '植物个护/美妆', icon: '🌿',
+    scoring: [
+      { name: '成分安全性', weight: 20 },
+      { name: '毛利空间', weight: 20 },
+      { name: '产地/成分故事', weight: 15 },
+      { name: '复购潜力', weight: 15 },
+      { name: '视觉素材', weight: 15 },
+      { name: '内容适配', weight: 10 },
+      { name: '可复制性', weight: 5 }
+    ],
+    passLine: 70,
+    priceFilter: { min: 49, max: 499, ideal: [79, 299] },
+    compliance: {
+      bannedWords: ['治疗','医药','药妆','三天见效','一周美白'],
+      forbidden: ['不得虚假夸大功效','不得使用医疗术语'],
+      canSay: ['成分科普','使用教程','产地溯源','对比评测'],
+      cannotSay: ['治疗疾病','绝对化功效承诺','虚假对比']
+    },
+    platforms: {
+      '抖音': { required: '化妆品备案号+品牌资质', difficulty: '中', searchTerms: ['植物护肤推荐','天然护肤品','成分党护肤品'] },
+      '小红书': { required: '化妆品备案号', difficulty: '低', searchTerms: ['植物精华推荐','敏感肌护肤','小众护肤品牌'] },
+      '淘宝': { required: '化妆品备案号', difficulty: '低', searchTerms: ['植物护肤品 国货','天然成分护肤品','小众护肤 原创'] },
+      '1688': { required: '化妆品生产许可', difficulty: '低', searchTerms: ['护肤品代工 植物成分','精油加工 ODM','护肤品源头厂家'] },
+      '百度': { required: '无', difficulty: '低', searchTerms: ['植物护肤品牌排行','新锐国货护肤','天然护肤成分趋势'] },
+      '快手': { required: '快手小店+化妆品备案', difficulty: '中', searchTerms: ['天然护肤品推荐','平价好用的国货护肤','成分党护肤直播'] }
+    },
+    targetUsers: '25-35岁女性、成分党、天然护肤、敏感肌',
+    profitModel: { grossMargin: '70-85%', netMargin: '25-45%' },
+    tools: { search: '灰豚/千瓜/蝉妈妈', verify: '企查查/1688', content: '秘塔写作猫/剪映/AI生图' }
+  },
+  '茶叶': {
+    name: '茶叶', icon: '🍵',
+    scoring: [
+      { name: '产地正宗', weight: 25 },
+      { name: '品质稳定', weight: 20 },
+      { name: '利润空间', weight: 20 },
+      { name: '故事素材', weight: 15 },
+      { name: '供应稳定', weight: 10 },
+      { name: '内容适配', weight: 10 }
+    ],
+    passLine: 65,
+    priceFilter: { min: 39, max: 1999, ideal: [99, 499] },
+    compliance: {
+      bannedWords: ['包治百病','延年益寿','抗癌'],
+      forbidden: ['不得虚假宣传产地/年份','不得宣称医疗功效'],
+      canSay: ['产地溯源','冲泡方法','品鉴知识','工艺讲解','茶文化'],
+      cannotSay: ['虚假产地','医疗功效','贬低其他茶类']
+    },
+    platforms: {
+      '抖音': { required: '食品经营许可', difficulty: '中', searchTerms: ['茶叶推荐','好喝的茶','口粮茶推荐'] },
+      '小红书': { required: '食品经营许可', difficulty: '低', searchTerms: ['小众茶叶推荐','产区直供茶','茶叶测评'] },
+      '淘宝': { required: '食品经营许可', difficulty: '低', searchTerms: ['产地直发茶叶','小众茶品牌','手工茶'] },
+      '1688': { required: '食品经营许可', difficulty: '低', searchTerms: ['茶叶批发 产地','茶叶厂家直供','源头茶厂'] },
+      '百度': { required: '无', difficulty: '低', searchTerms: ['中国地方名茶','小众茶品牌','茶叶产区排行'] },
+      '快手': { required: '快手小店+食品经营许可', difficulty: '中', searchTerms: ['原产地茶叶直播','茶农直供好茶','口粮茶推荐'] }
+    },
+    targetUsers: '25-55岁、茶爱好者、送礼需求、品质生活',
+    profitModel: { grossMargin: '50-75%', netMargin: '20-40%' },
+    tools: { search: '灰豚/千瓜', verify: '企查查/地理标志', content: '秘塔写作猫/剪映' }
+  },
+  '山货干货': {
+    name: '山货干货', icon: '🥜',
+    scoring: [
+      { name: '产地正宗', weight: 20 },
+      { name: '品质稳定', weight: 20 },
+      { name: '利润空间', weight: 20 },
+      { name: '故事素材', weight: 15 },
+      { name: '资质合规', weight: 15 },
+      { name: '供应稳定', weight: 10 }
+    ],
+    passLine: 65,
+    priceFilter: { min: 19, max: 599, ideal: [39, 199] },
+    compliance: {
+      bannedWords: ['包治百病','延年益寿','治疗'],
+      forbidden: ['不得宣称医疗功效','食品需有SC证'],
+      canSay: ['产地溯源','食用方法','品质辨别','营养科普'],
+      cannotSay: ['医疗功效','虚假产地']
+    },
+    platforms: {
+      '抖音': { required: '食品经营许可+SC证', difficulty: '中', searchTerms: ['地方特产干货','山货推荐','特产零食'] },
+      '小红书': { required: '食品经营许可', difficulty: '低', searchTerms: ['地方特产推荐','小众零食','土特产测评'] },
+      '淘宝': { required: '食品经营许可', difficulty: '低', searchTerms: ['产地直发干货','地方特产零食','农家山货'] },
+      '1688': { required: '食品经营许可', difficulty: '低', searchTerms: ['干货批发 产地','特产零食 源头','农产品代发'] },
+      '百度': { required: '无', difficulty: '低', searchTerms: ['中国地方特产排行','特色农产品','地标产品'] },
+      '快手': { required: '快手小店+食品经营许可+SC证', difficulty: '中', searchTerms: ['原产地特产直播','山货直供','农家土特产推荐'] }
+    },
+    targetUsers: '25-45岁、注重健康、送礼需求、地方特色爱好者',
+    profitModel: { grossMargin: '40-65%', netMargin: '15-35%' },
+    tools: { search: '灰豚/蝉妈妈', verify: '企查查/SC证查询', content: '秘塔写作猫/剪映' }
+  }
+};
+
+// ===========================
+// App State
+// ===========================
+let currentCategory = '白酒';
+let searchResults = [];
+let searchInProgress = false;
+
+// ===========================
+// Init
+// ===========================
+document.addEventListener('DOMContentLoaded', () => {
+  document.querySelectorAll('#categoryList li').forEach(li => {
+    li.addEventListener('click', function() {
+      document.querySelectorAll('#categoryList li').forEach(l => l.classList.remove('active'));
+      this.classList.add('active');
+      currentCategory = this.dataset.category;
+      updateCategoryUI();
+      resetSearch();
+    });
+  });
+
+  // Check bridge connection status
+  checkBridgeStatus();
+  setInterval(checkBridgeStatus, 15000); // re-check every 15s
+  updateCategoryUI();
+});
+
+function updateCategoryUI() {
+  const config = CATEGORY_CONFIGS[currentCategory];
+  document.getElementById('currentCatLabel').textContent = config.icon + ' ' + config.name;
+
+  // Update price range options
+  const pf = config.priceFilter;
+  const select = document.getElementById('priceRange');
+  select.innerHTML = `
+    <option value="all">不限</option>
+    <option value="0-${pf.ideal[0]}">${pf.ideal[0]}元以下</option>
+    <option value="${pf.ideal[0]}-${pf.ideal[1]}" selected>${pf.ideal[0]}-${pf.ideal[1]}元（推荐）</option>
+    <option value="${pf.ideal[1]}-${pf.max}">${pf.ideal[1]}-${pf.max}元</option>
+    <option value="${pf.max}+">${pf.max}元以上</option>
+  `;
+
+  // Display search keywords
+  displayKeywords(config);
+}
+
+function displayKeywords(config) {
+  const allTerms = new Set();
+  Object.values(config.platforms).forEach(p => {
+    p.searchTerms.forEach(t => allTerms.add(t));
+  });
+  const html = '<span style="font-size:12px;color:var(--text-light);margin-right:6px;">自动搜索词：</span>' +
+    [...allTerms].map(t => `<span class="keyword-tag" onclick="addKeyword('${t}')">${t}</span>`).join('');
+  document.getElementById('keywordsDisplay').innerHTML = html;
+
+  // Platform chips
+  const platformChips = '<span style="font-size:12px;color:var(--text-light);margin-right:6px;">覆盖平台：</span>' +
+    Object.entries(config.platforms).map(([name, info]) =>
+      `<span class="platform-chip active">${name} <span style="font-size:10px;opacity:0.7">${info.difficulty}</span></span>`
+    ).join('');
+  document.getElementById('keywordsDisplay').innerHTML += '<br>' + platformChips;
+}
+
+function addKeyword(kw) {
+  document.getElementById('originPref').value = kw;
+}
+
+// ===========================
+// Search Engine
+// ===========================
+// ============= 实时搜索模式 =============
+const BRIDGE_URL = 'http://localhost:3456';
+let searchPollTimer = null;
+let searchRequestId = null;
+
+async function startSearch() {
+  if (searchInProgress) return;
+  searchInProgress = true;
+
+  const config = CATEGORY_CONFIGS[currentCategory];
+  const originPref = document.getElementById('originPref').value.trim();
+  const platformCount = parseInt(document.getElementById('platformCount').value);
+
+  // Clear old polling
+  if (searchPollTimer) { clearInterval(searchPollTimer); searchPollTimer = null; }
+
+  // Show progress
+  const progressEl = document.getElementById('searchProgress');
+  progressEl.style.display = 'block';
+  const progressText = document.getElementById('progressText');
+  progressText.innerHTML = `${config.icon} <b>正在发起真实全网搜索</b>（WebSearch 多平台并发）...`;
+
+  searchResults = [];
+
+  // Step 1: Send search request to bridge server
+  try {
+    const searchPayload = {
+      category: currentCategory,
+      categoryName: config.name,
+      originPref,
+      platforms: Object.keys(config.platforms).slice(0, platformCount),
+      searchKeywords: config.searchKeywords || [],
+      priceFilter: config.priceFilter,
+      passLine: config.passLine,
+    };
+
+    const resp = await fetch(`${BRIDGE_URL}/api/search`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(searchPayload),
+    });
+    const data = await resp.json();
+    searchRequestId = data.id;
+
+    progressText.innerHTML = `${config.icon} <b>搜索请求已提交 (ID: ${searchRequestId.slice(-8)})</b><br><span style="font-size:12px;color:#888;">WorkBuddy AI 正在调用 WebSearch 查询真实数据，请稍候...</span>`;
+
+    // Step 2: Poll for results
+    let pollCount = 0;
+    searchPollTimer = setInterval(async () => {
+      pollCount++;
+      try {
+        const statusResp = await fetch(`${BRIDGE_URL}/api/status/${searchRequestId}`);
+        const statusData = await statusResp.json();
+
+        if (statusData.status === 'completed') {
+          clearInterval(searchPollTimer);
+          searchPollTimer = null;
+
+          // Step 3: Fetch results
+          const resultsResp = await fetch(`${BRIDGE_URL}/api/results/${searchRequestId}`);
+          const resultsData = await resultsResp.json();
+
+          if (resultsData.products && resultsData.products.length > 0) {
+            // Score each product using category rules
+            searchResults = resultsData.products.map(p => {
+              const scores = scoreProduct(config, p);
+              const total = scores.reduce((sum, s) => sum + s.weighted, 0);
+              return {
+                ...p,
+                platform: p.source || '全网搜索',
+                scores,
+                total,
+                fromLiveSearch: true,
+              };
+            });
+
+            // Sort by score descending
+            searchResults.sort((a, b) => b.total - a.total);
+            finishSearch(config);
+            document.getElementById('engineStatus').textContent =
+              `🌐 实时搜索完成：${searchResults.length}个候选 · 数据来源: ${resultsData.sources?.join('、') || '多平台'}`;
+          } else {
+            // No results from live search, fallback to sample
+            progressText.textContent = `${config.icon} 实时搜索未找到匹配结果，加载示例数据...`;
+            setTimeout(() => loadSampleResults(), 500);
+          }
+        } else {
+          // Still pending
+          const dots = '.'.repeat((pollCount % 4) + 1);
+          progressText.innerHTML = `${config.icon} <b>AI正在全网搜索中${dots}</b><br><span style="font-size:12px;color:#888;">已轮询 ${pollCount} 次 · 数据来源: 抖音/小红书/快手/淘宝/京东/百度等 ${platformCount} 个平台</span>`;
+        }
+      } catch (e) {
+        // Poll error, retry
+        if (pollCount > 30) {
+          clearInterval(searchPollTimer);
+          searchPollTimer = null;
+          progressText.textContent = `${config.icon} 搜索超时，加载示例数据...`;
+          setTimeout(() => loadSampleResults(), 500);
+        }
+      }
+
+      // Timeout after 60 seconds
+      if (pollCount > 60) {
+        clearInterval(searchPollTimer);
+        searchPollTimer = null;
+        progressText.textContent = `${config.icon} 搜索超时（60秒），加载示例数据...`;
+        setTimeout(() => loadSampleResults(), 500);
+      }
+    }, 1000);
+
+  } catch (e) {
+    // Bridge not available — fallback to offline mode
+    progressText.textContent = `${config.icon} 桥接服务未启动，使用离线示例数据...`;
+    setTimeout(() => loadSampleResults(), 800);
+  }
+}
+
+function generatePlatformResults(config, platform, originPref) {
+  const results = [];
+  const pf = config.priceFilter;
+  const platformInfo = config.platforms[platform];
+  const count = platform === '百度' ? 3 : platform === '1688' ? 2 : 1; // 百度多搜几个
+
+  // Use known product names or generate based on category
+  const productPool = getProductPool(config, platform);
+
+  for (let i = 0; i < Math.min(count, productPool.length); i++) {
+    const product = productPool[i];
+    if (originPref && !product.origin.includes(originPref) && !product.name.includes(originPref)) continue;
+
+    // Score
+    const scores = scoreProduct(config, product);
+
+    results.push({
+      ...product,
+      platform,
+      scores,
+      total: scores.reduce((sum, s) => sum + s.weighted, 0),
+    });
+  }
+
+  return results;
+}
+
+function getProductPool(config, platform) {
+  // Realistic product pools per category - these simulate actual search results
+  const pools = {
+    '白酒': [
+      { name: '南池翠N9', brand: '南池翠酒业', spec: '500ml 52°浓香', price: 128, cost: 60,
+        origin: '四川邛崃', desc: '四川老八大原酒厂，1988年建厂，40年名优窖池群（与五粮液同批入选），五粮固态发酵，基酒陶坛窖藏9年+15年老酒勾调。复购率85%+，好评率98%，被称为"名酒平替"。有SC证和完整检测报告。',
+        star: 4.8, sales: 8500, source: '今日头条/新浪/什么值得买多平台推荐' },
+      { name: '临江王T6', brand: '临江王酒业', spec: '500ml 52°特香型', price: 78, cost: 36,
+        origin: '江西樟树', desc: '特香型白酒发源地，酒厂前身1958年国营清江县二轻酒厂，60余年无工艺断代。红褚条石窖池发酵，整粒鄱阳湖富硒大米酿造，九年陶坛基酒+二十年老酒勾调。一酒三香（浓头清中酱尾），好评率98%+。SC证齐全。',
+        star: 4.7, sales: 12000, source: '今日头条/什么值得买/新浪多平台推荐' },
+      { name: '石荣霄秘曲6', brand: '石荣霄酒业', spec: '500ml 53°酱香', price: 108, cost: 50,
+        origin: '贵州茅台镇', desc: '1879年荣太和烧坊创始品牌，140余年历史，2025年入选"贵州老字号"。茅台镇7.5km²核心产区，12987坤沙工艺，基酒窖藏6年+，纯粮固态双认证（中检科创），杂醇油仅为国标1/6。获IWSC/SFWSC国际奖项。',
+        star: 4.9, sales: 6500, source: '网易/新浪/太原新闻网评测推荐' },
+      { name: '梅江烧·非遗陈酿', brand: '汪海洋梅江烧', spec: '500ml 52°清香', price: 280, cost: 130,
+        origin: '浙江兰溪', desc: '金华非遗酿造技艺，百年汪裕丰酒坊传承。连续20年浙江省农博会金奖，入选《浙江省重点商标保护名录》，获"全国名特优新农产品"认证。荞麦酿造，多次糖化发酵工艺，一斤荞麦只出1.5两酒，被誉为"江南小茅台"。资质齐全。',
+        star: 4.6, sales: 1500, source: '腾讯新闻/浙江本地推荐' },
+      { name: '北大仓部优经典1984', brand: '北大仓酒厂', spec: '500ml 50°酱香', price: 50, cost: 22,
+        origin: '黑龙江齐齐哈尔', desc: '北国酱香代表，东北黑土地高粱酿造，GB/T26760优级。酱香纯正带粮香，入口柔和不辣喉，百元内酱香黑马。地方老品牌，资质齐全，供应稳定。',
+        star: 4.5, sales: 18000, source: '什么值得买/百度搜索推荐' },
+      { name: '叙府大曲蓝标', brand: '叙府酒业', spec: '500ml 52°浓香', price: 40, cost: 18,
+        origin: '四川宜宾', desc: '与五粮液同产区，GB/T10781.1优级，纯粮固态。窖香清雅、入口绵甜，百元内浓香口粮标杆。有SC证，资质齐全，供应稳定。',
+        star: 4.4, sales: 25000, source: '什么值得买/京东热门推荐' },
+      { name: '高洲11年真年份', brand: '高洲酒业', spec: '500ml 53°酱香', price: 99, cost: 45,
+        origin: '四川宜宾', desc: '公证处溯源认证11年真年份，酒体老熟突出，陈味十足，入口柔和顺滑。SC证齐全，检测报告完备。年销量稳定增长。',
+        star: 4.6, sales: 3000, source: '今日头条/什么值得买评测推荐' },
+      { name: '筑春酒复古版', brand: '筑春酒业', spec: '500ml 53°酱香', price: 150, cost: 68,
+        origin: '贵州贵阳', desc: '贵州老八大名酒之一，酱香纯正、陈香明显，酒体醇厚。比习酒更小众，送礼自饮皆可。GB/T26760优级，资质齐全。',
+        star: 4.5, sales: 2200, source: '什么值得买/百度搜索推荐' },
+      { name: '绿脖西凤酒', brand: '西凤酒厂', spec: '500ml 55°凤香', price: 50, cost: 22,
+        origin: '陕西宝鸡', desc: '凤香型白酒标杆，清而不淡、浓而不艳，尾带蜜香。GB/T10781.2优级，老酒鬼私藏口粮，"憋屈好酒"代表。品牌知名度高，资质齐全。',
+        star: 4.7, sales: 30000, source: '什么值得买/京东/淘宝热销' },
+      { name: '遵仁台酱酒', brand: '遵仁台酒业', spec: '500ml 53°酱香', price: 89, cost: 40,
+        origin: '贵州茅台镇', desc: '茅台镇核心产区，古法手工酿造，一年深度发酵+5年陶坛窖藏。酱香中透花香、芝麻香、果香、粮香，层次丰富。SC资质齐全，性价比高，适合口粮酱酒入门。需确认品牌商标状态。',
+        star: 4.4, sales: 4000, source: '百度搜索/自媒体推荐' },
+      { name: '明光酒', brand: '明光酒厂', spec: '500ml 46°浓香', price: 68, cost: 30,
+        origin: '安徽明光', desc: '江淮名酒带产物，独特淡绿色酒体，地下岩层过滤水源酿造。酒体饱满，风味独特，入口协调舒缓。地方老品牌，SC资质齐全。',
+        star: 4.2, sales: 3500, source: '百度搜索/地方特产推荐' },
+      { name: '董酒密藏', brand: '董酒股份', spec: '500ml 54°董香型', price: 120, cost: 55,
+        origin: '贵州遵义', desc: '董香型（药香型）代表，药香与酒香融合，入口微苦后甜，尾净味长。小众香型宝藏款，GB/T26760优级。上市公司品牌，资质完整。',
+        star: 4.6, sales: 1800, source: '什么值得买推荐' },
+    ],
+    '植物个护': [
+      { name: '云南积雪草修护精华', brand: '植愈滇峰', spec: '30ml', price: 169, cost: 38,
+        origin: '云南', desc: '云南高海拔野生积雪草萃取，专注敏感肌修护。合作中科院昆明植物研究所，有完整化妆品备案。',
+        star: 4.7, sales: 3000, source: '小红书/淘宝' },
+      { name: '新疆薰衣草精油', brand: '伊帕尔芳', spec: '10ml', price: 128, cost: 25,
+        origin: '新疆伊犁', desc: '伊犁薰衣草基地直供，有机认证，GC-MS检测报告齐全。单方+复方精油系列。',
+        star: 4.8, sales: 5000, source: '小红书热门' },
+      { name: '广西金花茶面霜', brand: '茶颜本草', spec: '50g', price: 199, cost: 45,
+        origin: '广西防城港', desc: '金花茶提取物护肤，国家化妆品备案，合作广西中医药大学。抗氧修护方向。',
+        star: 4.5, sales: 1200, source: '1688 ODM' },
+      { name: '四川竹萃清洁面膜', brand: '竹本清源', spec: '100g', price: 89, cost: 18,
+        origin: '四川宜宾', desc: '宜宾竹炭+竹叶提取物，深层清洁。化妆品备案齐全，ODM可定制。',
+        star: 4.3, sales: 2500, source: '抖音电商' },
+      { name: '贵州苗方洗发水', brand: '苗岭本草', spec: '300ml', price: 79, cost: 15,
+        origin: '贵州黔东南', desc: '苗药配方改良，植物防脱洗发。有化妆品备案，成分安全性待验证。',
+        star: 4.1, sales: 8000, source: '1688批发' },
+    ],
+    '茶叶': [
+      { name: '勐海古树普洱生茶', brand: '勐海老寨', spec: '200g茶饼', price: 199, cost: 80,
+        origin: '云南勐海', desc: '勐海核心产区300年以上古树春茶，传统石磨压制。有地理标志认证。',
+        star: 4.8, sales: 1500, source: '淘宝/内容平台' },
+      { name: '正山小种红茶', brand: '武夷山桐木关', spec: '250g', price: 168, cost: 70,
+        origin: '福建武夷山', desc: '桐木关正山小种，传统松烟熏制，国家地理标志产品。',
+        star: 4.7, sales: 3000, source: '京东/小红书' },
+      { name: '福鼎老白茶', brand: '太姥山白茶', spec: '350g茶饼', price: 258, cost: 110,
+        origin: '福建福鼎', desc: '福鼎太姥山产区，2018年原料，枣香药香明显。地理标志+有机双认证。',
+        star: 4.9, sales: 800, source: '内容电商' },
+      { name: '西湖龙井', brand: '梅家坞龙井', spec: '100g', price: 328, cost: 160,
+        origin: '浙江杭州', desc: '正宗西湖龙井一级产区，地理标志认证，明前头采。',
+        star: 4.9, sales: 500, source: '高端推荐' },
+      { name: '安溪铁观音', brand: '感德铁观音', spec: '500g', price: 128, cost: 50,
+        origin: '福建安溪', desc: '安溪感德镇核心产区，清香型铁观音。地理标志认证，SC齐全。',
+        star: 4.5, sales: 4000, source: '1688批发' },
+    ],
+    '山货干货': [
+      { name: '云南野生菌礼盒', brand: '滇菌王', spec: '500g礼盒', price: 168, cost: 70,
+        origin: '云南楚雄', desc: '楚雄野生松茸+牛肝菌+鸡枞菌组合，产地直发，有SC证和检测报告。',
+        star: 4.7, sales: 3000, source: '淘宝/小红书' },
+      { name: '东北黑木耳', brand: '长白山珍', spec: '250g', price: 49, cost: 18,
+        origin: '吉林长白山', desc: '长白山椴木黑木耳，无硫熏无添加，SC认证+检测报告。',
+        star: 4.6, sales: 8000, source: '1688批发' },
+      { name: '宁夏枸杞', brand: '塞上红', spec: '500g', price: 89, cost: 35,
+        origin: '宁夏中宁', desc: '中宁核心产区，地理标志产品，有机认证。颗粒饱满，无硫处理。',
+        star: 4.8, sales: 5000, source: '京东/淘宝' },
+    ]
+  };
+
+  return pools[config.name] || pools['白酒'];
+}
+
+// ===========================
+// Scoring Engine
+// ===========================
+function scoreProduct(config, product) {
+  return config.scoring.map(dim => {
+    let score = 0;
+
+    if (dim.name.includes('地方') || dim.name.includes('产地')) {
+      score = product.origin && product.desc && product.desc.length > 15 ? 85 : product.origin ? 65 : 35;
+    } else if (dim.name.includes('资质') || dim.name.includes('安全')) {
+      const hasCert = product.desc.includes('SC') || product.desc.includes('备案') || product.desc.includes('认证');
+      score = hasCert ? 80 : (product.desc.includes('资质') ? 60 : 40);
+    } else if (dim.name.includes('利润') || dim.name.includes('毛利')) {
+      const margin = (product.price - product.cost) / product.price * 100;
+      score = margin > 65 ? 95 : margin > 50 ? 80 : margin > 35 ? 65 : margin > 20 ? 50 : 30;
+    } else if (dim.name.includes('故事') || dim.name.includes('素材') || dim.name.includes('内容')) {
+      score = product.desc && product.desc.length > 40 ? 85 : product.desc && product.desc.length > 20 ? 70 : 45;
+    } else if (dim.name.includes('供应')) {
+      const salesScore = product.sales > 5000 ? 85 : product.sales > 2000 ? 70 : product.sales > 500 ? 55 : 40;
+      score = salesScore;
+    } else if (dim.name.includes('复制')) {
+      score = 65;
+    } else if (dim.name.includes('复购')) {
+      score = config.name.includes('个护') ? 75 : 65;
+    } else if (dim.name.includes('视觉')) {
+      score = 70;
+    } else if (dim.name.includes('品质')) {
+      score = product.star > 4.6 ? 85 : product.star > 4.3 ? 70 : 55;
+    } else {
+      score = 60;
+    }
+
+    const weighted = Math.round(score * dim.weight / 100);
+    return { name: dim.name, weight: dim.weight, score, weighted };
+  });
+}
+
+// ===========================
+// Display Results
+// ===========================
+function finishSearch(config) {
+  searchInProgress = false;
+  document.getElementById('searchProgress').style.display = 'none';
+
+  // Deduplicate and sort by score
+  const seen = new Set();
+  searchResults = searchResults.filter(r => {
+    const key = r.name + r.brand;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+
+  searchResults.sort((a, b) => b.total - a.total);
+
+  // Update stats
+  const highCount = searchResults.filter(r => r.total >= 85).length;
+  const midCount = searchResults.filter(r => r.total >= config.passLine && r.total < 85).length;
+  const lowCount = searchResults.filter(r => r.total < config.passLine).length;
+
+  document.getElementById('statTotal').textContent = searchResults.length;
+  document.getElementById('statHigh').textContent = highCount;
+  document.getElementById('statMid').textContent = midCount;
+  document.getElementById('statLow').textContent = lowCount;
+  document.getElementById('statsBar').style.display = 'grid';
+
+  // Render results
+  renderResults(config);
+
+  document.getElementById('engineStatus').textContent =
+    `搜索完成：${searchResults.length}个候选 · ${highCount}个推荐进入 · ${midCount}个建议测试`;
+}
+
+function renderResults(config) {
+  const area = document.getElementById('resultsArea');
+
+  if (searchResults.length === 0) {
+    area.innerHTML = `<div class="empty-state"><div class="icon">😕</div><h3>未找到符合条件的候选产品</h3><p>尝试调整价格带、产地方向、或扩大搜索平台数量</p></div>`;
+    return;
+  }
+
+  let html = '';
+
+  searchResults.forEach((product, idx) => {
+    const rank = idx + 1;
+    const total = product.total;
+    let cardClass = 'product-card';
+    let verdictClass = 'skip';
+    let verdictText = '不推荐';
+    let scoreClass = 'low';
+    let scoreColor = 'var(--danger)';
+
+    if (total >= 85) {
+      cardClass += ' top-pick';
+      verdictClass = 'enter';
+      verdictText = '✅ 推荐进入';
+      scoreClass = 'high';
+      scoreColor = 'var(--success)';
+    } else if (total >= config.passLine) {
+      cardClass += ' good';
+      verdictClass = 'test';
+      verdictText = '⚠️ 建议测试';
+      scoreClass = 'mid';
+      scoreColor = 'var(--warning)';
+    } else {
+      cardClass += ' skip';
+    }
+
+    const stars = total >= 90 ? '⭐⭐⭐⭐⭐' : total >= 80 ? '⭐⭐⭐⭐☆' : total >= 70 ? '⭐⭐⭐☆☆' : total >= 60 ? '⭐⭐☆☆☆' : '⭐☆☆☆☆';
+    const margin = ((product.price - product.cost) / product.price * 100).toFixed(0);
+
+    html += `
+    <div class="${cardClass}" id="product-${idx}">
+      <div class="product-card-header" onclick="toggleDetail(${idx})">
+        <div class="product-rank">#${rank}</div>
+        <div class="product-info">
+          <div class="product-name">${config.icon} ${product.name}</div>
+          <div class="product-meta">
+            <span>🏷️ ${product.brand}</span>
+            <span>📦 ${product.spec}</span>
+            <span>💰 ¥${product.price}</span>
+            <span>📈 毛利${margin}%</span>
+            <span>📍 ${product.origin}</span>
+            <span style="color:var(--warning)">⭐ ${product.star}</span>
+          </div>
+          <div style="margin-top:4px;display:flex;gap:6px;flex-wrap:wrap;">
+            ${product.scores.map(s => {
+              const badgeClass = s.score >= 80 ? 'a' : s.score >= 65 ? 'b' : s.score >= 50 ? 'c' : 'd';
+              return `<span class="score-badge ${badgeClass}">${s.name} ${s.score}分</span>`;
+            }).join('')}
+          </div>
+        </div>
+        <div class="product-score-box">
+          <div class="score-num ${scoreClass}">${total}</div>
+          <div class="score-label">/100分</div>
+        </div>
+        <div class="product-verdict">
+          <span class="verdict-tag ${verdictClass}">${verdictText}</span>
+          <div style="font-size:11px;color:var(--text-light);margin-top:4px;">${stars}</div>
+        </div>
+      </div>
+      <div class="product-detail" id="detail-${idx}"></div>
+    </div>`;
+  });
+
+  area.innerHTML = html;
+}
+
+function toggleDetail(idx) {
+  const detailEl = document.getElementById('detail-' + idx);
+  if (!detailEl) return;
+
+  const isOpen = detailEl.classList.contains('open');
+
+  // Close all other details
+  document.querySelectorAll('.product-detail.open').forEach(el => {
+    el.classList.remove('open');
+  });
+
+  if (!isOpen) {
+    // Generate detail content (six-step analysis for this product)
+    const product = searchResults[idx];
+    const config = CATEGORY_CONFIGS[currentCategory];
+    detailEl.innerHTML = generateDetailHTML(config, product);
+    detailEl.classList.add('open');
+    detailEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }
+}
+
+function generateDetailHTML(config, product) {
+  const margin = ((product.price - product.cost) / product.price * 100).toFixed(1);
+  const netProfit = (product.price - product.cost - product.price * 0.1).toFixed(2);
+  const netMargin = (netProfit / product.price * 100).toFixed(1);
+
+  // Gate decisions
+  const gate1Pass = product.total >= config.passLine;
+  const gate2Pass = parseFloat(netProfit) > 0;
+  const gate3Pass = product.desc && product.desc.length > 30;
+
+  let decisionClass, decisionText, decisionIcon;
+  if (gate1Pass && gate2Pass && gate3Pass) {
+    decisionClass = 'enter'; decisionText = '✅ 建议进入 · 三关全过'; decisionIcon = '🚀';
+  } else if (gate1Pass && gate2Pass) {
+    decisionClass = 'test'; decisionText = '⚠️ 建议小样测试 · 复制性待验证'; decisionIcon = '🧪';
+  } else if (gate1Pass) {
+    decisionClass = 'pause'; decisionText = '⏸️ 建议暂缓 · 成本需要优化'; decisionIcon = '⏸️';
+  } else {
+    decisionClass = 'pause'; decisionText = '❌ 不建议进入 · 评分不达标'; decisionIcon = '❌';
+  }
+
+  return `
+    <div class="detail-decision ${decisionClass}">
+      <span style="font-size:28px;">${decisionIcon}</span>
+      <span>${decisionText}</span>
+    </div>
+
+    <div class="detail-gates">
+      <div class="detail-gate ${gate1Pass ? 'pass' : 'fail'}">
+        <h5>🚪 第一道门</h5>
+        <div class="gate-icon">${gate1Pass ? '✅' : '❌'}</div>
+        <p style="font-size:12px;color:var(--text-light)">能不能做<br>评分${product.total}/100</p>
+      </div>
+      <div class="detail-gate ${gate2Pass ? 'pass' : 'fail'}">
+        <h5>🚪 第二道门</h5>
+        <div class="gate-icon">${gate2Pass ? '✅' : '❌'}</div>
+        <p style="font-size:12px;color:var(--text-light)">能不能赚钱<br>净利¥${netProfit}/单</p>
+      </div>
+      <div class="detail-gate ${gate3Pass ? 'pass' : 'fail'}">
+        <h5>🚪 第三道门</h5>
+        <div class="gate-icon">${gate3Pass ? '✅' : '⚠️'}</div>
+        <p style="font-size:12px;color:var(--text-light)">能不能复制<br>${gate3Pass ? '素材充足' : '素材待补充'}</p>
+      </div>
+    </div>
+
+    <div class="mini-steps">
+      <!-- Step 0: Scoring -->
+      <div class="mini-step">
+        <h5>📊 选品评分</h5>
+        <table>
+          <tr><th>维度</th><th>权重</th><th>评分</th><th>加权</th></tr>
+          ${product.scores.map(s => `
+            <tr>
+              <td>${s.name}</td><td>${s.weight}%</td>
+              <td style="color:${s.score >= 80 ? 'var(--success)' : s.score >= 60 ? 'var(--warning)' : 'var(--danger)'}">${s.score}</td>
+              <td>${s.weighted}</td>
+            </tr>
+          `).join('')}
+        </table>
+        <p style="font-weight:700;margin-top:6px;">总分：${product.total}/100 · 及格线：${config.passLine}分</p>
+      </div>
+
+      <!-- Step 1: Market Research -->
+      <div class="mini-step">
+        <h5>🔍 市场调查</h5>
+        <p><strong>来源平台：</strong>${product.platform} · ${product.source}</p>
+        <p><strong>评价：</strong>⭐${product.star} · 月销约${product.sales}+</p>
+        <p><strong>用户画像：</strong>${config.targetUsers}</p>
+        <p><strong>竞品参考：</strong>同品类${config.name}中价格带${product.price}元</p>
+        <p style="margin-top:4px;"><strong>建议搜索：</strong></p>
+        <ul>
+          <li>${product.name} 怎么样 评价</li>
+          <li>${product.brand} 口碑 资质</li>
+          <li>${config.name} ${product.price}元 推荐</li>
+        </ul>
+      </div>
+
+      <!-- Step 2: Track -->
+      <div class="mini-step">
+        <h5>🧭 赛道判断</h5>
+        <p><strong>赛道：</strong>${product.price < 100 ? '大众' : product.price < 300 ? '中端' : '高端'}${config.name}</p>
+        <p><strong>建议主阵地：</strong>${config.name === '白酒' ? '微信私域+视频号' : '小红书+抖音'}</p>
+        <p><strong>适合模式：</strong>${config.name === '白酒' ? '私域团购+企业福利' : '内容种草+电商转化'}</p>
+      </div>
+
+      <!-- Step 3: Positioning -->
+      <div class="mini-step">
+        <h5>🎯 产品定位</h5>
+        <p style="font-weight:700;color:var(--accent);">"${product.origin}的${product.desc ? product.desc.substring(0, 30) + '...' : product.name}"</p>
+        <p><strong>成交链路：</strong>内容种草 → ${config.name === '白酒' ? '私域承接 → 社群/团购' : '平台挂车 → 店铺成交'} → 复购</p>
+        <p><strong>信任链：</strong>产地信任 → 资质背书 → 用户口碑</p>
+      </div>
+
+      <!-- Step 4: Content -->
+      <div class="mini-step">
+        <h5>📝 内容获客</h5>
+        <p><strong>合规红线：</strong>${config.compliance.bannedWords.slice(0,4).join('、')}</p>
+        <p><strong>可讲：</strong>${config.compliance.canSay.slice(0,3).join('、')}</p>
+        <p><strong>选题方向：</strong></p>
+        <ul>
+          <li>${product.name}开箱实测：¥${product.price}值不值？</li>
+          <li>探访${product.brand}源头产地</li>
+          <li>为什么${product.origin}本地人认这个？</li>
+          <li>${product.name}完整${config.name === '白酒' ? '品鉴' : '测评'}指南</li>
+        </ul>
+      </div>
+
+      <!-- Step 5: Business -->
+      <div class="mini-step">
+        <h5>💰 商业测算</h5>
+        <table>
+          <tr><td>售价</td><td style="font-weight:700;">¥${product.price.toFixed(2)}</td></tr>
+          <tr><td>供货价</td><td>¥${product.cost.toFixed(2)}</td></tr>
+          <tr><td>毛利率</td><td style="color:var(--success)">${margin}%</td></tr>
+          <tr><td>净利率(估)</td><td style="color:${parseFloat(netMargin) > 10 ? 'var(--success)' : 'var(--warning)'}">${netMargin}%</td></tr>
+          <tr><td>保本ROI</td><td>${(product.price / (product.price - product.cost - product.price*0.1)).toFixed(2)}</td></tr>
+        </table>
+      </div>
+
+      <!-- Step 6: Review -->
+      <div class="mini-step">
+        <h5>🔄 复盘复制</h5>
+        <p><strong>监控指标：</strong>曝光量、点击率、加购率、GMV、退款率</p>
+        <p><strong>放量条件：</strong>ROI连续3天&gt;保本线×1.2</p>
+        <p><strong>止损条件：</strong>ROI连续3天&lt;保本线×0.8</p>
+        <p><strong>SOP可复制性：</strong>${gate3Pass ? '✅ 素材和模板可跨产品复用' : '⚠️ 需先补全产品素材'}</p>
+      </div>
+    </div>
+
+    <div class="detail-actions">
+      <button class="btn btn-outline btn-sm" onclick="event.stopPropagation();exportSingleProduct(${searchResults.findIndex(r => r.name === product.name)})">📝 导出此产品报告</button>
+      <button class="btn btn-outline btn-sm" onclick="event.stopPropagation();copyProductInfo('${product.name}')">📋 复制产品信息</button>
+    </div>
+  `;
+}
+
+// ===========================
+// Actions
+// ===========================
+function loadSampleResults() {
+  const config = CATEGORY_CONFIGS[currentCategory];
+  searchResults = [];
+  const pool = getProductPool(config, '百度');
+  pool.forEach(product => {
+    const scores = scoreProduct(config, product);
+    searchResults.push({ ...product, platform: '综合搜索', scores, total: scores.reduce((sum, s) => sum + s.weighted, 0) });
+  });
+  searchResults.sort((a, b) => b.total - a.total);
+
+  const highCount = searchResults.filter(r => r.total >= 85).length;
+  const midCount = searchResults.filter(r => r.total >= config.passLine && r.total < 85).length;
+  const lowCount = searchResults.filter(r => r.total < config.passLine).length;
+
+  document.getElementById('statTotal').textContent = searchResults.length;
+  document.getElementById('statHigh').textContent = highCount;
+  document.getElementById('statMid').textContent = midCount;
+  document.getElementById('statLow').textContent = lowCount;
+  document.getElementById('statsBar').style.display = 'grid';
+  document.getElementById('searchProgress').style.display = 'none';
+
+  renderResults(config);
+  document.getElementById('engineStatus').textContent = `示例数据：${searchResults.length}个候选 · ${highCount}个推荐进入`;
+  showToast('✅ 示例结果已加载，点击任意产品查看六步法详细分析');
+}
+
+function resetSearch() {
+  searchResults = [];
+  document.getElementById('resultsArea').innerHTML = `<div class="empty-state"><div class="icon">🔍</div><h3>选择品类，启动全网选品搜索</h3><p>AI搜索引擎将根据品类配置规则，从多个平台搜索候选产品</p><p style="font-size:12px;color:var(--text-light);margin-top:8px;">自动按选品维度评分排序，${CATEGORY_CONFIGS[currentCategory].passLine}分以上进入候选</p></div>`;
+  document.getElementById('statsBar').style.display = 'none';
+  document.getElementById('searchProgress').style.display = 'none';
+  document.getElementById('engineStatus').textContent = '选择品类，启动全网选品搜索';
+}
+
+function exportSingleProduct(idx) {
+  const product = searchResults[idx];
+  if (!product) { showToast('⚠️ 未找到该产品'); return; }
+  const config = CATEGORY_CONFIGS[currentCategory];
+  let md = `# ${product.name} · 六步法分析报告\n\n`;
+  md += `**品类：** ${config.name} | **品牌：** ${product.brand} | **售价：** ¥${product.price}\n`;
+  md += `**产地：** ${product.origin} | **规格：** ${product.spec} | **评分：** ${product.total}/100\n\n---\n\n`;
+  md += `## 选品评分\n\n`;
+  product.scores.forEach(s => { md += `- ${s.name}（权重${s.weight}%）：${s.score}分 → ${s.weighted}分\n`; });
+  md += `\n**总分：${product.total}/100**\n\n`;
+  md += `## 产品描述\n${product.desc}\n\n`;
+  md += `## 商业数据\n- 售价：¥${product.price}\n- 供货价：¥${product.cost}\n- 毛利率：${((product.price-product.cost)/product.price*100).toFixed(1)}%\n`;
+  downloadFile(`${product.name}_分析报告.md`, md);
+  showToast('✅ 报告已导出');
+}
+
+function copyProductInfo(name) {
+  const product = searchResults.find(r => r.name === name);
+  if (!product) return;
+  const info = `${product.name} | ${product.brand} | ${product.spec} | ¥${product.price} | 产地：${product.origin}`;
+  navigator.clipboard.writeText(info).then(() => showToast('✅ 已复制产品信息'));
+}
+
+function downloadFile(filename, content) {
+  const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = filename; a.click();
+  URL.revokeObjectURL(url);
+}
+
+// ===========================
+// Manual Product Add
+// ===========================
+function showManualAdd() {
+  document.getElementById('modalCatName').textContent = CATEGORY_CONFIGS[currentCategory].name;
+  document.getElementById('manualAddModal').classList.add('open');
+  // Clear previous values
+  ['manualName','manualBrand','manualSpec','manualOrigin','manualPrice','manualCost','manualDesc','manualStar','manualSales'].forEach(id => {
+    document.getElementById(id).value = id === 'manualStar' ? '4.5' : id === 'manualSales' ? '0' : '';
+  });
+}
+
+function closeModal(e) {
+  if (e && e.target !== document.getElementById('manualAddModal')) return;
+  document.getElementById('manualAddModal').classList.remove('open');
+}
+
+function submitManualProduct() {
+  const name = document.getElementById('manualName').value.trim();
+  const brand = document.getElementById('manualBrand').value.trim();
+  const origin = document.getElementById('manualOrigin').value.trim();
+  const price = parseFloat(document.getElementById('manualPrice').value);
+  const cost = parseFloat(document.getElementById('manualCost').value);
+  const desc = document.getElementById('manualDesc').value.trim();
+
+  // Validate required
+  if (!name || !brand || !origin || isNaN(price) || isNaN(cost) || !desc) {
+    showToast('⚠️ 请填写所有必填字段（名称、品牌、产地、售价、供货价、描述）');
+    return;
+  }
+  if (price <= 0 || cost < 0) { showToast('⚠️ 售价和供货价必须大于0'); return; }
+  if (cost >= price) { showToast('⚠️ 供货价不能大于等于售价'); return; }
+
+  const spec = document.getElementById('manualSpec').value.trim() || '未填';
+  const star = parseFloat(document.getElementById('manualStar').value) || 4.5;
+  const sales = parseInt(document.getElementById('manualSales').value) || 0;
+
+  const product = {
+    name, brand, spec, price, cost, origin, desc, star, sales,
+    platform: '手动添加',
+    source: '用户手工录入',
+  };
+
+  const config = CATEGORY_CONFIGS[currentCategory];
+  const scores = scoreProduct(config, product);
+  const total = scores.reduce((sum, s) => sum + s.weighted, 0);
+
+  const newResult = { ...product, scores, total };
+
+  // Insert into results if there are existing results, otherwise start new list
+  if (searchResults.length > 0) {
+    searchResults.push(newResult);
+    searchResults.sort((a, b) => b.total - a.total);
+  } else {
+    searchResults = [newResult];
+  }
+
+  // Update stats
+  const highCount = searchResults.filter(r => r.total >= 85).length;
+  const midCount = searchResults.filter(r => r.total >= config.passLine && r.total < 85).length;
+  const lowCount = searchResults.filter(r => r.total < config.passLine).length;
+
+  document.getElementById('statTotal').textContent = searchResults.length;
+  document.getElementById('statHigh').textContent = highCount;
+  document.getElementById('statMid').textContent = midCount;
+  document.getElementById('statLow').textContent = lowCount;
+  document.getElementById('statsBar').style.display = 'grid';
+  document.getElementById('searchProgress').style.display = 'none';
+
+  renderResults(config);
+  document.getElementById('engineStatus').textContent = `已添加"${name}" · 评分 ${total}/100 · 共${searchResults.length}个候选`;
+
+  closeModal();
+  showToast(`✅ 已添加「${name}」· 综合评分 ${total}/100 · ${total >= 85 ? '推荐进入' : total >= config.passLine ? '建议测试' : '不推荐'}`);
+
+  // Scroll to results
+  document.getElementById('resultsArea').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+// ============= 桥接服务连接检测 =============
+function checkBridgeStatus() {
+  const badge = document.getElementById('bridgeStatus');
+  fetch(`${BRIDGE_URL}/api/health`, { signal: AbortSignal.timeout(3000) })
+    .then(r => r.json())
+    .then(data => {
+      if (data.status === 'ok') {
+        badge.textContent = '⚡实时搜索已就绪';
+        badge.style.background = '#f0fdf4';
+        badge.style.color = '#16a34a';
+        badge.title = '桥接服务已连接 — 点击搜索将使用真实WebSearch';
+        document.getElementById('statusDot').style.background = '#16a34a';
+      }
+    })
+    .catch(() => {
+      badge.textContent = '⚡离线模式';
+      badge.style.background = '#fef2f2';
+      badge.style.color = '#dc2626';
+      badge.title = '桥接服务未连接 — 搜索将使用内置示例数据';
+      document.getElementById('statusDot').style.background = '#999';
+    });
+}
+
+function showToast(msg) {
+  const toast = document.getElementById('toast');
+  toast.textContent = msg;
+  toast.classList.add('show');
+  setTimeout(() => toast.classList.remove('show'), 2500);
+}
+</script>
+</body>
+</html>
