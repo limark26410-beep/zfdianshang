@@ -294,6 +294,17 @@ body {
 .setting-weight { width: 50px; text-align: center; font-size: 13px; font-weight: 600; color: var(--accent); }
 .setting-slider { flex: 2; -webkit-appearance: none; height: 6px; border-radius: 3px; background: #ddd; outline: none; cursor: pointer; }
 .setting-slider::-webkit-slider-thumb { -webkit-appearance: none; width: 18px; height: 18px; border-radius: 50%; background: var(--accent); cursor: pointer; }
+
+/* Custom Category */
+.custom-cats { margin-top: 4px; }
+.custom-cats .cat-item { display: flex; align-items: center; justify-content: space-between; padding: 10px 14px; border-radius: var(--radius-sm); margin-bottom: 2px; cursor: pointer; font-size: 13px; color: var(--text); background: transparent; transition: background .15s; }
+.custom-cats .cat-item:hover { background: #2a2a20; }
+.custom-cats .cat-item.active { background: var(--accent); color: #fff; }
+.custom-cats .cat-del { width: 20px; height: 20px; border-radius: 50%; border: none; background: transparent; color: #999; cursor: pointer; font-size: 14px; display: flex; align-items: center; justify-content: center; opacity: 0; transition: opacity .15s; }
+.custom-cats .cat-item:hover .cat-del { opacity: 1; }
+.custom-cats .cat-del:hover { background: rgba(255,255,255,.2); color: #f55; }
+.add-cat-btn { width: 100%; margin-top: 8px; padding: 8px; border: 1px dashed #555; border-radius: var(--radius-sm); background: transparent; color: #999; font-size: 12px; cursor: pointer; transition: all .15s; }
+.add-cat-btn:hover { border-color: var(--accent); color: var(--accent); background: rgba(180,160,110,.08); }
 </style>
 </head>
 <body>
@@ -312,6 +323,8 @@ body {
       <li data-category="茶叶">🍵 茶叶</li>
       <li data-category="山货干货">🥜 山货干货</li>
     </ul>
+    <div class="custom-cats" id="customCats"></div>
+    <button class="add-cat-btn" onclick="openAddCategory()">＋ 添加品类</button>
   </div>
   <div class="sidebar-section">
     <h3>搜索数据源</h3>
@@ -529,6 +542,73 @@ body {
     </div>
   </div>
 
+  <!-- Add Category Modal -->
+  <div class="modal-overlay" id="addCategoryModal" onclick="closeAddCategory(event)">
+    <div class="modal-box" onclick="event.stopPropagation()" style="max-width:600px;">
+      <div class="modal-header">
+        <h3>＋ 添加一级品类</h3>
+        <button class="modal-close" onclick="closeAddCategory()">&times;</button>
+      </div>
+      <div class="modal-body" style="max-height:58vh;overflow-y:auto;">
+        <p style="font-size:12px;color:var(--text-light);margin-bottom:16px;">
+          自定义品类将保存到本地浏览器，内置品类规则不可修改。
+        </p>
+        <div class="modal-grid">
+          <div class="form-group" style="grid-column:1/-1;display:flex;gap:10px;align-items:end;">
+            <div style="flex:3;">
+              <label>品类名称 <span style="color:var(--danger)">*</span></label>
+              <input type="text" id="catName" placeholder="如：特产零食、地方小吃、手工艺品" style="width:100%;">
+            </div>
+            <div style="flex:1;">
+              <label>图标 Emoji</label>
+              <input type="text" id="catIcon" placeholder="🏷️" maxlength="4" style="width:100%;text-align:center;font-size:18px;">
+            </div>
+          </div>
+          <div class="form-group">
+            <label>最低价格 (元)</label>
+            <input type="number" id="catPriceMin" value="19" min="0" style="width:100%;">
+          </div>
+          <div class="form-group">
+            <label>最高价格 (元)</label>
+            <input type="number" id="catPriceMax" value="299" min="1" style="width:100%;">
+          </div>
+          <div class="form-group">
+            <label>推荐价格下限 (元)</label>
+            <input type="number" id="catPriceIdealLow" value="49" min="0" style="width:100%;">
+          </div>
+          <div class="form-group">
+            <label>推荐价格上限 (元)</label>
+            <input type="number" id="catPriceIdealHigh" value="199" min="1" style="width:100%;">
+          </div>
+          <div class="form-group" style="grid-column: 1 / -1;">
+            <label>搜索关键词 <span style="color:var(--danger)">*</span> <span style="font-size:11px;color:var(--text-light);">（逗号分隔，将用于各平台搜索）</span></label>
+            <textarea id="catKeywords" rows="2" placeholder="如：地方特产,小众零食推荐,产地直发,特产礼盒" style="width:100%;"></textarea>
+          </div>
+          <div class="form-group" style="grid-column: 1 / -1;">
+            <label>目标人群</label>
+            <input type="text" id="catTargetUsers" placeholder="如：25-45岁、注重健康品质、送礼需求" style="width:100%;">
+          </div>
+          <div class="form-group">
+            <label>预计毛利率范围</label>
+            <input type="text" id="catMargin" placeholder="如：30-60%" style="width:100%;">
+          </div>
+          <div class="form-group">
+            <label>选品及格线</label>
+            <input type="number" id="catPassLine" value="70" min="40" max="95" style="width:100%;">
+          </div>
+          <div class="form-group" style="grid-column: 1 / -1;">
+            <label>合规禁用词 <span style="font-size:11px;color:var(--text-light);">（逗号分隔）</span></label>
+            <input type="text" id="catBannedWords" placeholder="如：特供,夸大功效,绝对化用语" style="width:100%;">
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-outline" onclick="closeAddCategory()">取消</button>
+        <button class="btn btn-primary" onclick="submitAddCategory()">✅ 添加品类</button>
+      </div>
+    </div>
+  </div>
+
 </main>
 
 <div class="toast" id="toast"></div>
@@ -663,6 +743,67 @@ const CATEGORY_CONFIGS = {
   }
 };
 
+// 自定义品类存储
+const CUSTOM_CATS_KEY = 'custom_categories';
+function loadCustomCategories() {
+  try { return JSON.parse(localStorage.getItem(CUSTOM_CATS_KEY) || '{}'); }
+  catch { return {}; }
+}
+function saveCustomCategories(data) {
+  localStorage.setItem(CUSTOM_CATS_KEY, JSON.stringify(data));
+}
+
+// 获取完整品类列表（内置+自定义），保持内置顺序
+function getAllCategories() {
+  const builtin = Object.keys(CATEGORY_CONFIGS);
+  const custom = loadCustomCategories();
+  const all = [...builtin];
+  for (const key of Object.keys(custom)) { if (!all.includes(key)) all.push(key); }
+  return all;
+}
+// 获取品类配置（先查内置，再查自定义）
+function getCategoryConfig(cat) {
+  if (CATEGORY_CONFIGS[cat]) return CATEGORY_CONFIGS[cat];
+  const custom = loadCustomCategories();
+  return custom[cat] || null;
+}
+// 品类是否可删除（内置不可删）
+function isCustomCategory(cat) { return !CATEGORY_CONFIGS[cat]; }
+// 创建默认品类配置
+function buildDefaultCategoryConfig(name, icon, keywords, priceMin, priceMax, idealLow, idealHigh, targetUsers, margin, passLine, bannedWords) {
+  const kw = keywords.split(/[,，]/).map(s => s.trim()).filter(Boolean);
+  const defaultPlatforms = ['淘宝','1688','百度','抖音','快手'];
+  const platforms = {};
+  defaultPlatforms.forEach(p => {
+    const difficultyMap = { '抖音':'中','快手':'中','淘宝':'低','1688':'低','百度':'低' };
+    platforms[p] = { required: '视具体品类而定', difficulty: difficultyMap[p] || '中', searchTerms: kw.slice(0,3) };
+  });
+  return {
+    name, icon: icon || '🏷️',
+    searchKeywords: kw,
+    scoring: [
+      { name: '产地/特色', weight: 20 },
+      { name: '资质合规', weight: 20 },
+      { name: '利润空间', weight: 20 },
+      { name: '供应稳定性', weight: 15 },
+      { name: '内容素材', weight: 15 },
+      { name: '可复制性', weight: 10 }
+    ],
+    passLine: passLine || 70,
+    priceFilter: { min: priceMin || 19, max: priceMax || 299, ideal: [idealLow || 49, idealHigh || 199] },
+    compliance: {
+      bannedWords: bannedWords ? bannedWords.split(/[,，]/).map(s => s.trim()).filter(Boolean) : [],
+      forbidden: ['遵守平台规定'],
+      canSay: ['产地故事','产品特点','使用场景','用户好评'],
+      cannotSay: ['虚假宣传','绝对化用语']
+    },
+    platforms,
+    targetUsers: targetUsers || '全年龄段',
+    profitModel: { grossMargin: margin || '30-60%', netMargin: '15-35%' },
+    tools: { search: '多平台', verify: '企查查', content: '秘塔写作猫/剪映' }
+  };
+}
+
 // ===========================
 // App State
 // ===========================
@@ -674,25 +815,71 @@ let searchInProgress = false;
 // Init
 // ===========================
 document.addEventListener('DOMContentLoaded', () => {
-  document.querySelectorAll('#categoryList li').forEach(li => {
-    li.addEventListener('click', function() {
-      document.querySelectorAll('#categoryList li').forEach(l => l.classList.remove('active'));
-      this.classList.add('active');
-      currentCategory = this.dataset.category;
-      updateCategoryUI();
-      resetSearch();
-    });
-  });
+  rebuildCategoryList();
+
+  // Load saved category preference
+  const savedCat = localStorage.getItem('currentCategory');
+  if (savedCat && getCategoryConfig(savedCat)) currentCategory = savedCat;
 
   // Check bridge connection status
   checkBridgeStatus();
-  setInterval(checkBridgeStatus, 15000); // re-check every 15s
+  setInterval(checkBridgeStatus, 15000);
   updateCategoryUI();
 });
 
+function rebuildCategoryList() {
+  const allCats = getAllCategories();
+  const builtinList = document.getElementById('categoryList');
+  const customDiv = document.getElementById('customCats');
+
+  // Rebuild built-in list events
+  builtinList.querySelectorAll('li').forEach(li => {
+    li.classList.toggle('active', li.dataset.category === currentCategory);
+    li.onclick = function() {
+      document.querySelectorAll('#categoryList li, #customCats .cat-item').forEach(l => l.classList.remove('active'));
+      this.classList.add('active');
+      currentCategory = this.dataset.category;
+      localStorage.setItem('currentCategory', currentCategory);
+      updateCategoryUI();
+      resetSearch();
+    };
+  });
+
+  // Rebuild custom categories
+  const customCats = loadCustomCategories();
+  let html = '';
+  for (const key of Object.keys(customCats)) {
+    // skip if also a built-in (shouldn't happen but safe)
+    if (CATEGORY_CONFIGS[key]) continue;
+    const cfg = customCats[key];
+    html += `<div class="cat-item${key === currentCategory ? ' active' : ''}" data-category="${escapeHtml(key)}" onclick="selectCustomCat('${escapeHtml(key)}')">
+      <span>${cfg.icon || '🏷️'} ${cfg.name}</span>
+      <button class="cat-del" title="删除品类" onclick="event.stopPropagation();deleteCustomCat('${escapeHtml(key)}')">✕</button>
+    </div>`;
+  }
+  customDiv.innerHTML = html;
+
+  // Ensure current category actually exists
+  if (!getCategoryConfig(currentCategory)) {
+    currentCategory = '白酒';
+    localStorage.setItem('currentCategory', currentCategory);
+  }
+}
+
+function selectCustomCat(key) {
+  currentCategory = key;
+  localStorage.setItem('currentCategory', currentCategory);
+  rebuildCategoryList();
+  updateCategoryUI();
+  resetSearch();
+}
+
+function escapeHtml(s) { return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;'); }
+
 function updateCategoryUI() {
-  const config = CATEGORY_CONFIGS[currentCategory];
-  document.getElementById('currentCatLabel').textContent = config.icon + ' ' + config.name;
+  const config = getCategoryConfig(currentCategory);
+  if (!config) return;
+  document.getElementById('currentCatLabel').textContent = (config.icon || '🏷️') + ' ' + config.name;
 
   // Update price range options
   const pf = config.priceFilter;
@@ -743,7 +930,7 @@ async function startSearch() {
   if (searchInProgress) return;
   searchInProgress = true;
 
-  const config = CATEGORY_CONFIGS[currentCategory];
+  const config = getCategoryConfig(currentCategory);
   const originPref = document.getElementById('originPref').value.trim();
   const platformCount = parseInt(document.getElementById('platformCount').value);
 
@@ -765,7 +952,7 @@ async function startSearch() {
       categoryName: config.name,
       originPref,
       platforms: Object.keys(config.platforms).slice(0, platformCount),
-      searchKeywords: config.searchKeywords || [],
+      searchKeywords: config.searchKeywords || [...new Set(Object.values(config.platforms).flatMap(p => p.searchTerms || []))].slice(0, 10),
       priceFilter: config.priceFilter,
       passLine: config.passLine,
     };
@@ -1034,7 +1221,7 @@ function getProductPool(config, platform) {
     ]
   };
 
-  return pools[config.name] || pools['白酒'];
+  return pools[config.name] || (isCustomCategory(currentCategory) ? [] : pools['白酒']);
 }
 
 // ===========================
@@ -1212,7 +1399,7 @@ function toggleDetail(idx) {
   if (!isOpen) {
     // Generate detail content (six-step analysis for this product)
     const product = searchResults[idx];
-    const config = CATEGORY_CONFIGS[currentCategory];
+    const config = getCategoryConfig(currentCategory);
     detailEl.innerHTML = generateDetailHTML(config, product);
     detailEl.classList.add('open');
     detailEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
@@ -1371,7 +1558,7 @@ function smartShuffle(arr) {
 
 function loadSampleResults() {
   searchInProgress = false;
-  const config = CATEGORY_CONFIGS[currentCategory];
+  const config = getCategoryConfig(currentCategory);
   const pool = getProductPool(config, '百度');
 
   // Step 1: Filter by user parameters
@@ -1425,7 +1612,7 @@ function loadSampleResults() {
 
 function resetSearch() {
   searchResults = [];
-  document.getElementById('resultsArea').innerHTML = `<div class="empty-state"><div class="icon">🔍</div><h3>选择品类，启动全网选品搜索</h3><p>AI搜索引擎将根据品类配置规则，从多个平台搜索候选产品</p><p style="font-size:12px;color:var(--text-light);margin-top:8px;">自动按选品维度评分排序，${CATEGORY_CONFIGS[currentCategory].passLine}分以上进入候选</p></div>`;
+  document.getElementById('resultsArea').innerHTML = `<div class="empty-state"><div class="icon">🔍</div><h3>选择品类，启动全网选品搜索</h3><p>AI搜索引擎将根据品类配置规则，从多个平台搜索候选产品</p><p style="font-size:12px;color:var(--text-light);margin-top:8px;">自动按选品维度评分排序，${getCategoryConfig(currentCategory).passLine}分以上进入候选</p></div>`;
   document.getElementById('statsBar').style.display = 'none';
   document.getElementById('searchProgress').style.display = 'none';
   document.getElementById('engineStatus').textContent = '选择品类，启动全网选品搜索';
@@ -1434,7 +1621,7 @@ function resetSearch() {
 function exportSingleProduct(idx) {
   const product = searchResults[idx];
   if (!product) { showToast('⚠️ 未找到该产品'); return; }
-  const config = CATEGORY_CONFIGS[currentCategory];
+  const config = getCategoryConfig(currentCategory);
   let md = `# ${product.name} · 六步法分析报告\n\n`;
   md += `**品类：** ${config.name} | **品牌：** ${product.brand} | **售价：** ¥${product.price}\n`;
   md += `**产地：** ${product.origin} | **规格：** ${product.spec} | **评分：** ${product.total}/100\n\n---\n\n`;
@@ -1466,7 +1653,7 @@ function downloadFile(filename, content) {
 // Manual Product Add
 // ===========================
 function showManualAdd() {
-  document.getElementById('modalCatName').textContent = CATEGORY_CONFIGS[currentCategory].name;
+  document.getElementById('modalCatName').textContent = getCategoryConfig(currentCategory).name;
   document.getElementById('manualAddModal').classList.add('open');
   // Clear previous values
   ['manualName','manualBrand','manualSpec','manualOrigin','manualPrice','manualCost','manualDesc','manualStar','manualSales'].forEach(id => {
@@ -1505,7 +1692,7 @@ function submitManualProduct() {
     source: '用户手工录入',
   };
 
-  const config = CATEGORY_CONFIGS[currentCategory];
+  const config = getCategoryConfig(currentCategory);
   const scores = scoreProduct(config, product);
   const total = scores.reduce((sum, s) => sum + s.weighted, 0);
 
@@ -1604,7 +1791,7 @@ function cancelSearch() {
 
 // ============= 设置面板 =============
 function showSettings() {
-  const cat = CATEGORY_CONFIGS[currentCategory];
+  const cat = getCategoryConfig(currentCategory);
   document.getElementById('settingsCatName').textContent = cat.name || currentCategory;
 
   // Load saved values
@@ -1659,7 +1846,7 @@ function updateWeightSlider(slider) {
 }
 
 function saveSettings() {
-  const cat = CATEGORY_CONFIGS[currentCategory];
+  const cat = getCategoryConfig(currentCategory);
 
   // Save thresholds
   localStorage.setItem(`passLine_${currentCategory}`, document.getElementById('setPassLine').value);
@@ -1687,7 +1874,7 @@ function saveSettings() {
 
 function settingsApplyToCurrent() {
   if (searchResults.length === 0) { showToast('⚠️ 请先搜索一次后再应用设置'); return; }
-  const config = CATEGORY_CONFIGS[currentCategory];
+  const config = getCategoryConfig(currentCategory);
 
   // Re-score all products
   searchResults.forEach(r => {
@@ -1713,7 +1900,7 @@ function settingsApplyToCurrent() {
 }
 
 function resetSettingsToDefault() {
-  const cat = CATEGORY_CONFIGS[currentCategory];
+  const cat = getCategoryConfig(currentCategory);
   document.getElementById('setPassLine').value = cat.passLine || 70;
   document.getElementById('setHighLine').value = 85;
   document.getElementById('setMinMargin').value = 30;
@@ -1721,6 +1908,87 @@ function resetSettingsToDefault() {
   document.getElementById('setBridgeTimeout').value = '30';
   loadWeightSliders(cat);
   showToast('🔄 已恢复默认值（点保存生效）');
+}
+
+// ===========================
+// 品类管理：添加/删除自定义品类
+// ===========================
+function openAddCategory() {
+  document.getElementById('addCategoryModal').classList.add('open');
+  // Reset form
+  document.getElementById('catName').value = '';
+  document.getElementById('catIcon').value = '🏷️';
+  document.getElementById('catPriceMin').value = '19';
+  document.getElementById('catPriceMax').value = '299';
+  document.getElementById('catPriceIdealLow').value = '49';
+  document.getElementById('catPriceIdealHigh').value = '199';
+  document.getElementById('catKeywords').value = '';
+  document.getElementById('catTargetUsers').value = '';
+  document.getElementById('catMargin').value = '30-60%';
+  document.getElementById('catPassLine').value = '70';
+  document.getElementById('catBannedWords').value = '';
+  document.getElementById('catName').focus();
+}
+
+function closeAddCategory(e) {
+  if (e && e.target !== document.getElementById('addCategoryModal')) return;
+  document.getElementById('addCategoryModal').classList.remove('open');
+}
+
+function submitAddCategory() {
+  const name = document.getElementById('catName').value.trim();
+  if (!name) { showToast('⚠️ 请输入品类名称'); return; }
+
+  // Check duplicate
+  const allCats = getAllCategories();
+  if (allCats.some(c => c === name)) { showToast('⚠️ 该品类已存在'); return; }
+
+  const icon = document.getElementById('catIcon').value.trim() || '🏷️';
+  const keywords = document.getElementById('catKeywords').value.trim();
+  if (!keywords) { showToast('⚠️ 请输入搜索关键词'); return; }
+
+  const config = buildDefaultCategoryConfig(
+    name,
+    icon,
+    keywords,
+    parseInt(document.getElementById('catPriceMin').value) || 19,
+    parseInt(document.getElementById('catPriceMax').value) || 299,
+    parseInt(document.getElementById('catPriceIdealLow').value) || 49,
+    parseInt(document.getElementById('catPriceIdealHigh').value) || 199,
+    document.getElementById('catTargetUsers').value.trim() || '全年龄段',
+    document.getElementById('catMargin').value.trim() || '30-60%',
+    parseInt(document.getElementById('catPassLine').value) || 70,
+    document.getElementById('catBannedWords').value.trim()
+  );
+
+  const allCustom = loadCustomCategories();
+  allCustom[name] = config;
+  saveCustomCategories(allCustom);
+
+  document.getElementById('addCategoryModal').classList.remove('open');
+  currentCategory = name;
+  localStorage.setItem('currentCategory', currentCategory);
+  rebuildCategoryList();
+  updateCategoryUI();
+  resetSearch();
+  showToast('✅ 品类「' + name + '」已添加，点击"全网选品搜索"开始选品');
+}
+
+function deleteCustomCat(key) {
+  if (!confirm('确定删除自定义品类「' + key + '」？此操作不可恢复。')) return;
+  const allCustom = loadCustomCategories();
+  delete allCustom[key];
+  saveCustomCategories(allCustom);
+
+  // If currently selected, switch to default
+  if (currentCategory === key) {
+    currentCategory = '白酒';
+    localStorage.setItem('currentCategory', currentCategory);
+  }
+  rebuildCategoryList();
+  updateCategoryUI();
+  resetSearch();
+  showToast('🗑️ 品类「' + key + '」已删除');
 }
 </script>
 </body>
