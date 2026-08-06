@@ -984,8 +984,18 @@ async function startSearch() {
           const resultsData = await resultsResp.json();
 
           if (resultsData.products && resultsData.products.length > 0) {
+            // Enrich products with defaults for missing fields (DuckDuckGo results lack cost/desc/sales/star)
+            const enriched = resultsData.products.map(p => ({
+              ...p,
+              cost: p.cost || Math.round((p.price || 50) * 0.4),
+              desc: p.desc || p.description || '',
+              sales: p.sales || 1000,
+              star: p.star || 4.5,
+              origin: p.origin || '全网',
+              brand: p.brand || p.name || '',
+            }));
             // Score each product using category rules
-            searchResults = resultsData.products.map(p => {
+            searchResults = enriched.map(p => {
               const scores = scoreProduct(config, p);
               const total = scores.reduce((sum, s) => sum + s.weighted, 0);
               return {
@@ -1237,16 +1247,18 @@ function scoreProduct(config, product) {
     if (dim.name.includes('地方') || dim.name.includes('产地')) {
       score = product.origin && product.desc && product.desc.length > 15 ? 85 : product.origin ? 65 : 35;
     } else if (dim.name.includes('资质') || dim.name.includes('安全')) {
-      const hasCert = product.desc.includes('SC') || product.desc.includes('备案') || product.desc.includes('认证');
-      score = hasCert ? 80 : (product.desc.includes('资质') ? 60 : 40);
+      const desc = product.desc || '';
+      const hasCert = desc.includes('SC') || desc.includes('备案') || desc.includes('认证');
+      score = hasCert ? 80 : (desc.includes('资质') ? 60 : 40);
     } else if (dim.name.includes('利润') || dim.name.includes('毛利')) {
-      const margin = (product.price - product.cost) / product.price * 100;
+      const cost = product.cost || product.price * 0.4;
+      const margin = (product.price - cost) / product.price * 100;
       score = margin > 65 ? 95 : margin > 50 ? 80 : margin > 35 ? 65 : margin > 20 ? 50 : 30;
     } else if (dim.name.includes('故事') || dim.name.includes('素材') || dim.name.includes('内容')) {
-      score = product.desc && product.desc.length > 40 ? 85 : product.desc && product.desc.length > 20 ? 70 : 45;
+      const desc = product.desc || '';
+      score = desc.length > 40 ? 85 : desc.length > 20 ? 70 : 45;
     } else if (dim.name.includes('供应')) {
-      const salesScore = product.sales > 5000 ? 85 : product.sales > 2000 ? 70 : product.sales > 500 ? 55 : 40;
-      score = salesScore;
+      score = product.sales > 5000 ? 85 : product.sales > 2000 ? 70 : product.sales > 500 ? 55 : 40;
     } else if (dim.name.includes('复制')) {
       score = 65;
     } else if (dim.name.includes('复购')) {
