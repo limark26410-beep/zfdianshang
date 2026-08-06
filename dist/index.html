@@ -350,7 +350,7 @@ body {
     <div class="status-badge">
       <span class="status-dot" id="statusDot"></span>
       <span id="engineStatus">选择品类，启动全网选品搜索</span>
-      <span id="bridgeStatus" style="margin-left:10px;font-size:11px;padding:2px 8px;border-radius:12px;background:#fef2f2;color:#dc2626;" title="桥接服务连接状态">⚡离线模式</span>
+      <span id="bridgeStatus" style="margin-left:10px;font-size:11px;padding:2px 8px;border-radius:12px;background:#fef2f2;color:#dc2626;" title="桥接搜索服务状态">⚡未连接</span>
       <button class="btn btn-outline btn-sm" onclick="showSettings()" style="margin-left:10px;" title="调整六步法规则参数">⚙️ 设置</button>
     </div>
   </div>
@@ -390,7 +390,6 @@ body {
 
     <div class="btn-group">
       <button class="btn btn-primary" onclick="startSearch()">🔍 全网选品搜索</button>
-      <button class="btn btn-success" onclick="loadSampleResults()">📋 加载示例结果</button>
       <button class="btn btn-outline" onclick="showManualAdd()">✚ 手动添加产品</button>
       <button class="btn btn-outline btn-sm" onclick="resetSearch()">🔄 重置</button>
     </div>
@@ -1013,9 +1012,20 @@ async function startSearch() {
             document.getElementById('engineStatus').textContent =
               `🌐 实时搜索完成：${searchResults.length}个候选 · ${resultsData.generated ? 'AI自动生成' : '数据来源: ' + (resultsData.sources?.join('、') || '多平台')}`;
           } else {
-            // No results from live search, fallback to sample
-            progressText.textContent = `${config.icon} 实时搜索未找到匹配结果，加载示例数据...`;
-            setTimeout(() => loadSampleResults(), 500);
+            // No results from live search — honest empty state
+            progressEl.style.display = 'none';
+            searchInProgress = false;
+            document.getElementById('resultsArea').innerHTML = `<div class="empty-state">
+              <div class="icon">🔍</div>
+              <h3>未搜索到「${config.name}」相关产品</h3>
+              <p>搜索引擎未找到匹配结果，尝试调整关键词或手动添加产品。</p>
+              <div style="margin-top:12px;display:flex;gap:8px;justify-content:center;">
+                <button class="btn btn-primary" onclick="showManualAdd()">✚ 手动添加产品</button>
+                <button class="btn btn-outline" onclick="startSearch()">🔄 重新搜索</button>
+              </div>
+            </div>`;
+            document.getElementById('statsBar').style.display = 'none';
+            document.getElementById('engineStatus').textContent = `「${config.name}」· 全网未搜索到匹配产品`;
           }
         } else {
           // Still searching
@@ -1030,205 +1040,42 @@ async function startSearch() {
       if (pollCount > 90) {
         clearInterval(searchPollTimer);
         searchPollTimer = null;
-        progressText.textContent = `${config.icon} 搜索超时（45秒），加载本地数据...`;
-        setTimeout(() => loadSampleResults(), 500);
+        progressEl.style.display = 'none';
+        searchInProgress = false;
+        document.getElementById('resultsArea').innerHTML = `<div class="empty-state">
+          <div class="icon">⏱️</div>
+          <h3>搜索超时（45秒）</h3>
+          <p>当前网络环境较慢或关键词覆盖太广，建议缩减关键词数量后重试。</p>
+          <div style="margin-top:12px;">
+            <button class="btn btn-primary" onclick="startSearch()">🔄 重新搜索</button>
+          </div>
+        </div>`;
+        document.getElementById('statsBar').style.display = 'none';
+        document.getElementById('engineStatus').textContent = `「${config.name}」· 搜索超时，请重试`;
       }
     }, 500);
 
   } catch (e) {
-    // Bridge not available — fallback to offline mode (product pool)
-    progressText.textContent = `${config.icon} 桥接服务未启动，使用本地产品池...`;
-    setTimeout(() => loadSampleResults(), 800);
+    // Bridge not available
+    progressEl.style.display = 'none';
+    searchInProgress = false;
+    document.getElementById('resultsArea').innerHTML = `<div class="empty-state">
+      <div class="icon">🔌</div>
+      <h3>桥接搜索服务未启动</h3>
+      <p>请先启动桥接服务器（<code>node bridge-server.js</code>），或使用「手动添加产品」功能。</p>
+      <div style="margin-top:12px;display:flex;gap:8px;justify-content:center;">
+        <button class="btn btn-primary" onclick="showManualAdd()">✚ 手动添加产品</button>
+        <button class="btn btn-outline" onclick="startSearch()">🔄 重试连接</button>
+      </div>
+    </div>`;
+    document.getElementById('statsBar').style.display = 'none';
+    document.getElementById('engineStatus').textContent = '桥接服务未启动 — 请先启动 node bridge-server.js';
   }
-}
-
-function generatePlatformResults(config, platform, originPref) {
-  const results = [];
-  const pool = getProductPool(config, platform);
-
-  // Filter by origin preference
-  let filtered = pool.filter(p => {
-    if (originPref && !p.origin.toLowerCase().includes(originPref.toLowerCase()) && !p.name.includes(originPref)) return false;
-    return true;
-  });
-
-  // Shuffle for variety
-  filtered = smartShuffle(filtered);
-
-  // Per-platform result count
-  const count = platform === '百度' ? 4 : platform === '快手' ? 3 : platform === '1688' ? 2 : 2;
-
-  for (let i = 0; i < Math.min(count, filtered.length); i++) {
-    const product = filtered[i];
-    const scores = scoreProduct(config, product);
-    results.push({
-      ...product,
-      platform,
-      scores,
-      total: scores.reduce((sum, s) => sum + s.weighted, 0),
-    });
-  }
-
-  return results;
-}
-
-function getProductPool(config, platform) {
-  // Realistic product pools per category - these simulate actual search results
-  const pools = {
-    '白酒': [
-      // --- 酱香型 (50-300元) ---
-      { name: '石荣霄秘曲6', brand: '石荣霄酒业', spec: '500ml 53°酱香', price: 108, cost: 50,
-        origin: '贵州茅台镇', desc: '1879年荣太和烧坊创始品牌，贵州老字号。茅台镇7.5km²核心产区，12987坤沙工艺，基酒窖藏6年+，纯粮固态双认证。获IWSC/SFWSC国际奖项。',
-        star: 4.9, sales: 6500, source: '网易/新浪/什么值得买评测推荐' },
-      { name: '金沙回沙五星', brand: '金沙酒业', spec: '500ml 53°酱香', price: 85, cost: 40,
-        origin: '贵州金沙', desc: '贵州知名酱酒企业，大厂嫡系核心口粮款。传统回沙工艺，GB/T26760优级。酱香纯正、焦糊香突出，百元内酱酒品质稳定款，老酒友私藏口粮。',
-        star: 4.6, sales: 22000, source: '京东/什么值得买/百度推荐' },
-      { name: '高洲11年真年份', brand: '高洲酒业', spec: '500ml 53°酱香', price: 99, cost: 45,
-        origin: '四川宜宾', desc: '公证处溯源认证11年真年份，酒体老熟突出，陈味十足，入口柔和顺滑。SC证齐全，检测报告完备。',
-        star: 4.6, sales: 3000, source: '今日头条/什么值得买评测' },
-      { name: '潭酒1935', brand: '仙潭酒厂', spec: '500ml 53°酱香', price: 65, cost: 30,
-        origin: '四川古蔺', desc: '川派酱香流量爆款，1964年建厂老牌原酒厂。大曲坤沙工艺，基酒陈放3年+，百元内少有大厂嫡系纯粮坤沙口粮。活动价常在60-70元。',
-        star: 4.5, sales: 15000, source: '京东/今日头条/什么值得买推荐' },
-      { name: '北大仓部优经典1984', brand: '北大仓酒厂', spec: '500ml 50°酱香', price: 50, cost: 22,
-        origin: '黑龙江齐齐哈尔', desc: '北国酱香代表，东北黑土地高粱酿造，GB/T26760优级。酱香纯正带粮香，入口柔和不辣喉，百元内酱香黑马。',
-        star: 4.5, sales: 18000, source: '什么值得买/百度搜索推荐' },
-      { name: '筑春酒复古版', brand: '筑春酒业', spec: '500ml 53°酱香', price: 150, cost: 68,
-        origin: '贵州贵阳', desc: '贵州老八大名酒之一，酱香纯正、陈香明显，酒体醇厚。比习酒更小众，送礼自饮皆可。GB/T26760优级。',
-        star: 4.5, sales: 2200, source: '什么值得买/百度搜索推荐' },
-      { name: '夜郎老精品', brand: '夜郎酒业', spec: '500ml 53°酱香', price: 99, cost: 45,
-        origin: '贵州遵义', desc: '小众产区代表，红缨子糯高粱+坤沙工艺+5年陈放。酱香混青苹果香，中段焦糊香饱满。被酒友称为"茅香平替刺客"。',
-        star: 4.4, sales: 5000, source: '新浪/电商平台推荐' },
-      { name: '国康1935', brand: '国康酒业', spec: '500ml 53°酱香', price: 100, cost: 46,
-        origin: '贵州仁怀', desc: '茅台集团前酿酒师范应华大师操刀，原料/工艺/水源复刻茅台标准。老酒比例高达30%，入口丝滑无刺激感。',
-        star: 4.3, sales: 3500, source: '新浪/电商评测推荐' },
-      { name: '初喜恭喜', brand: '初喜酒业', spec: '500ml 53°酱香', price: 128, cost: 58,
-        origin: '贵州茅台镇', desc: '茅台镇核心产区喜宴场景品牌，12987坤沙工艺，PICC承保+假一赔十万。酒体柔顺、空杯留香24h+，2025年喜宴满意度93%+。',
-        star: 4.7, sales: 8000, source: '新浪/头条/电商评测推荐' },
-      { name: '珍酒珍十五', brand: '珍酒股份', spec: '500ml 53°酱香', price: 280, cost: 130,
-        origin: '贵州遵义', desc: '"异地茅台"品牌，基酒7年+，大曲坤沙工艺。品牌知名度高，口感柔和易饮，送礼体面、商务场合撑得住。活动价三百以内。',
-        star: 4.8, sales: 5000, source: '腾讯新闻/京东/天猫推荐' },
-      { name: '遵仁台酱酒', brand: '遵仁台酒业', spec: '500ml 53°酱香', price: 89, cost: 40,
-        origin: '贵州茅台镇', desc: '茅台镇核心产区，古法手工酿造，5年陶坛窖藏。酱香中透花香/芝麻香/果香/粮香，层次丰富。性价比高，需确认品牌商标状态。',
-        star: 4.3, sales: 4000, source: '百度搜索/自媒体推荐' },
-      // --- 浓香型 ---
-      { name: '南池翠N9', brand: '南池翠酒业', spec: '500ml 52°浓香', price: 128, cost: 60,
-        origin: '四川邛崃', desc: '四川老八大原酒厂，40年名优窖池群（与五粮液同批入选），五粮固态发酵，基酒窖藏9年+15年老酒勾调。复购率85%+。',
-        star: 4.8, sales: 8500, source: '今日头条/新浪/什么值得买推荐' },
-      { name: '叙府大曲蓝标', brand: '叙府酒业', spec: '500ml 52°浓香', price: 40, cost: 18,
-        origin: '四川宜宾', desc: '与五粮液同产区，GB/T10781.1优级纯粮固态。窖香清雅、入口绵甜，百元内浓香口粮标杆。有SC证，资质齐全。',
-        star: 4.4, sales: 25000, source: '什么值得买/京东热门推荐' },
-      { name: '古井贡酒老玻贡', brand: '古井贡酒', spec: '500ml 50°浓香', price: 78, cost: 36,
-        origin: '安徽亳州', desc: '徽派浓香代表，中华老字号，大厂嫡系核心口粮款。"老五甑"工艺，复古玻璃瓶身。窖香与粮香平衡协调，长辈接受度极高。',
-        star: 4.5, sales: 15000, source: '什么值得买/京东评测推荐' },
-      { name: '伊力特曲', brand: '伊力特酒业', spec: '500ml 52°浓香', price: 89, cost: 42,
-        origin: '新疆伊犁', desc: '新疆浓香代表，大厂嫡系，天山雪水酿造。窖香浓郁且带天然果香，入口绵甜醇厚。北方酒友日常口粮首选。',
-        star: 4.4, sales: 10000, source: '什么值得买/百度评测推荐' },
-      { name: '五粮液尖庄', brand: '五粮液集团', spec: '500ml 42°浓香', price: 75, cost: 34,
-        origin: '四川宜宾', desc: '五粮液亲民嫡系，多粮固态发酵。入口柔和绵润，42度对新手友好。大厂品质，百元内绵柔浓香代表。',
-        star: 4.6, sales: 30000, source: '京东/淘宝/什么值得买推荐' },
-      { name: '泸州老窖头曲', brand: '泸州老窖', spec: '500ml 52°浓香', price: 80, cost: 38,
-        origin: '四川泸州', desc: '浓香鼻祖入门产品，中华老字号，窖池年限超30年。GB/T10781.1优级，窖香纯正、入口顺滑、尾净回甘。',
-        star: 4.5, sales: 28000, source: '京东/什么值得买/商超推荐' },
-      { name: '剑南春绵竹大曲', brand: '剑南春', spec: '500ml 52°浓香', price: 58, cost: 26,
-        origin: '四川绵竹', desc: '中华老字号，传统固态发酵。口感醇厚甘冽，性价比极高，复购率41.5%。百元内浓香口粮必选。',
-        star: 4.4, sales: 35000, source: '京东/什么值得买推荐' },
-      { name: '玉蝉大曲', brand: '玉蝉酒业', spec: '500ml 52°浓香', price: 60, cost: 28,
-        origin: '四川泸州', desc: '泸州老字号，百年以上老窖池发酵。窖香浓郁（似熟菠萝+苹果复合香），入口绵甜饱满。包装朴素但酒质可靠。',
-        star: 4.2, sales: 8000, source: '新浪评测/电商推荐' },
-      { name: '明光酒', brand: '明光酒厂', spec: '500ml 46°浓香', price: 68, cost: 30,
-        origin: '安徽明光', desc: '江淮名酒带产物，独特淡绿色酒体，地下岩层过滤水源酿造。酒体饱满，风味独特。地方老品牌，SC资质齐全。',
-        star: 4.2, sales: 3500, source: '百度搜索/地方特产推荐' },
-      // --- 清香型 ---
-      { name: '汾酒黄盖玻汾', brand: '汾酒集团', spec: '500ml 53°清香', price: 45, cost: 20,
-        origin: '山西杏花村', desc: '清香型标杆，国民口粮酒天花板。清蒸二次清工艺，GB/T10781.2优级。清香纯正、入口绵甜爽净，市场占有率22%，复购率43.2%。',
-        star: 4.8, sales: 80000, source: '全网推荐/京东/什么值得买' },
-      { name: '出口白瓷汾', brand: '汾酒集团', spec: '500ml 53°清香', price: 75, cost: 35,
-        origin: '山西杏花村', desc: '玻汾升级版，出口品质内销价格。纯粮地缸发酵，酒体更柔和纯净。清香清雅持久，包装简约大气，自饮送礼皆可。',
-        star: 4.6, sales: 12000, source: '京东/什么值得买推荐' },
-      { name: '宝丰大曲青瓷', brand: '宝丰酒业', spec: '500ml 50°清香', price: 72, cost: 33,
-        origin: '河南宝丰', desc: '河南老名酒，千年地缸发酵工艺，大厂嫡系。粮香突出且伴随淡雅果香，青瓷瓶身雅致。老酒友日常换口味优选。',
-        star: 4.4, sales: 6000, source: '什么值得买/评测推荐' },
-      { name: '晋泉高粱白', brand: '晋泉酒业', spec: '500ml 53°清香', price: 40, cost: 17,
-        origin: '山西太原', desc: '山西中华老字号，纯高粱固态发酵。酒香质朴纯正、粮香浓郁，入口清冽甘爽。35-45元超低定价，性价比碾压同价位。',
-        star: 4.3, sales: 15000, source: '百度/今日头条推荐' },
-      // --- 特色香型 ---
-      { name: '临江王T6', brand: '临江王酒业', spec: '500ml 52°特香型', price: 78, cost: 36,
-        origin: '江西樟树', desc: '特香型发源地，1958年国营酒厂，60余年无工艺断代。整粒富硒大米酿造，一酒三香（浓头清中酱尾），好评率98%+。',
-        star: 4.7, sales: 12000, source: '今日头条/什么值得买/新浪推荐' },
-      { name: '绿脖西凤酒', brand: '西凤酒厂', spec: '500ml 55°凤香', price: 50, cost: 22,
-        origin: '陕西宝鸡', desc: '四大名酒之一，凤香型标杆。老五甑固态发酵+柳木酒海储存，带木质蜜香与杏仁回甘。醇厚有劲，"憋屈好酒"代表。',
-        star: 4.7, sales: 30000, source: '京东/淘宝/什么值得买热销' },
-      { name: '白云边12年陈酿', brand: '白云边酒业', spec: '500ml 42°兼香型', price: 118, cost: 54,
-        origin: '湖北松滋', desc: '兼香型标杆，大厂嫡系，清蒸清烧+酱香堆积结合工艺。浓酱协调，口感温润，42度适配多数人。活动价可降至百元内。',
-        star: 4.5, sales: 18000, source: '京东/什么值得买/天猫推荐' },
-      { name: '酒鬼酒湘泉', brand: '酒鬼酒股份', spec: '500ml 52°馥郁香型', price: 65, cost: 30,
-        origin: '湖南吉首', desc: '馥郁香型代表，三香一体工艺。浓清香三香交织，入口清甜、中段窖香浓郁、尾段酱香绵长。小众风味宝藏口粮。',
-        star: 4.4, sales: 9000, source: '京东/什么值得买推荐' },
-      { name: '四特酒绵柔型', brand: '四特酒业', spec: '500ml 45°特香型', price: 82, cost: 38,
-        origin: '江西樟树', desc: '江西特香名酒，大厂嫡系。米香与窖香交织，入口绵柔顺滑，45度对新手友好。江南酒友日常口粮。',
-        star: 4.3, sales: 7000, source: '什么值得买/评测推荐' },
-      { name: '董酒密藏', brand: '董酒股份', spec: '500ml 54°董香型', price: 120, cost: 55,
-        origin: '贵州遵义', desc: '董香型（药香型）代表，药香与酒香融合，入口微苦后甜，尾净味长。小众香型宝藏款，上市公司品牌。',
-        star: 4.6, sales: 1800, source: '什么值得买推荐' },
-      // --- 中高端/送礼 (200-500元) ---
-      { name: '梅江烧非遗陈酿', brand: '汪海洋梅江烧', spec: '500ml 52°清香', price: 280, cost: 130,
-        origin: '浙江兰溪', desc: '金华非遗酿造，百年汪裕丰酒坊传承。连续20年省农博会金奖，入选省重点商标保护名录。荞麦酿造，一斤只出1.5两酒，被誉为"江南小茅台"。',
-        star: 4.6, sales: 1500, source: '腾讯新闻/浙江本地推荐' },
-      { name: '赖鼎君见', brand: '赖鼎酒业', spec: '500ml 53°酱香', price: 398, cost: 180,
-        origin: '贵州茅台镇', desc: '茅台镇赖氏嫡传，贵州老字号。洞藏酱香，酒体醇厚回甘悠长。都市快报团队赴茅台镇实地考察甄选定制，398-498元价位。',
-        star: 4.7, sales: 800, source: '腾讯新闻/都市快报推荐' },
-    ],
-    '植物个护': [
-      { name: '云南积雪草修护精华', brand: '植愈滇峰', spec: '30ml', price: 169, cost: 38,
-        origin: '云南', desc: '云南高海拔野生积雪草萃取，专注敏感肌修护。合作中科院昆明植物研究所，有完整化妆品备案。',
-        star: 4.7, sales: 3000, source: '小红书/淘宝' },
-      { name: '新疆薰衣草精油', brand: '伊帕尔芳', spec: '10ml', price: 128, cost: 25,
-        origin: '新疆伊犁', desc: '伊犁薰衣草基地直供，有机认证，GC-MS检测报告齐全。单方+复方精油系列。',
-        star: 4.8, sales: 5000, source: '小红书热门' },
-      { name: '广西金花茶面霜', brand: '茶颜本草', spec: '50g', price: 199, cost: 45,
-        origin: '广西防城港', desc: '金花茶提取物护肤，国家化妆品备案，合作广西中医药大学。抗氧修护方向。',
-        star: 4.5, sales: 1200, source: '1688 ODM' },
-      { name: '四川竹萃清洁面膜', brand: '竹本清源', spec: '100g', price: 89, cost: 18,
-        origin: '四川宜宾', desc: '宜宾竹炭+竹叶提取物，深层清洁。化妆品备案齐全，ODM可定制。',
-        star: 4.3, sales: 2500, source: '抖音电商' },
-      { name: '贵州苗方洗发水', brand: '苗岭本草', spec: '300ml', price: 79, cost: 15,
-        origin: '贵州黔东南', desc: '苗药配方改良，植物防脱洗发。有化妆品备案，成分安全性待验证。',
-        star: 4.1, sales: 8000, source: '1688批发' },
-    ],
-    '茶叶': [
-      { name: '勐海古树普洱生茶', brand: '勐海老寨', spec: '200g茶饼', price: 199, cost: 80,
-        origin: '云南勐海', desc: '勐海核心产区300年以上古树春茶，传统石磨压制。有地理标志认证。',
-        star: 4.8, sales: 1500, source: '淘宝/内容平台' },
-      { name: '正山小种红茶', brand: '武夷山桐木关', spec: '250g', price: 168, cost: 70,
-        origin: '福建武夷山', desc: '桐木关正山小种，传统松烟熏制，国家地理标志产品。',
-        star: 4.7, sales: 3000, source: '京东/小红书' },
-      { name: '福鼎老白茶', brand: '太姥山白茶', spec: '350g茶饼', price: 258, cost: 110,
-        origin: '福建福鼎', desc: '福鼎太姥山产区，2018年原料，枣香药香明显。地理标志+有机双认证。',
-        star: 4.9, sales: 800, source: '内容电商' },
-      { name: '西湖龙井', brand: '梅家坞龙井', spec: '100g', price: 328, cost: 160,
-        origin: '浙江杭州', desc: '正宗西湖龙井一级产区，地理标志认证，明前头采。',
-        star: 4.9, sales: 500, source: '高端推荐' },
-      { name: '安溪铁观音', brand: '感德铁观音', spec: '500g', price: 128, cost: 50,
-        origin: '福建安溪', desc: '安溪感德镇核心产区，清香型铁观音。地理标志认证，SC齐全。',
-        star: 4.5, sales: 4000, source: '1688批发' },
-    ],
-    '山货干货': [
-      { name: '云南野生菌礼盒', brand: '滇菌王', spec: '500g礼盒', price: 168, cost: 70,
-        origin: '云南楚雄', desc: '楚雄野生松茸+牛肝菌+鸡枞菌组合，产地直发，有SC证和检测报告。',
-        star: 4.7, sales: 3000, source: '淘宝/小红书' },
-      { name: '东北黑木耳', brand: '长白山珍', spec: '250g', price: 49, cost: 18,
-        origin: '吉林长白山', desc: '长白山椴木黑木耳，无硫熏无添加，SC认证+检测报告。',
-        star: 4.6, sales: 8000, source: '1688批发' },
-      { name: '宁夏枸杞', brand: '塞上红', spec: '500g', price: 89, cost: 35,
-        origin: '宁夏中宁', desc: '中宁核心产区，地理标志产品，有机认证。颗粒饱满，无硫处理。',
-        star: 4.8, sales: 5000, source: '京东/淘宝' },
-    ]
-  };
-
-  return pools[config.name] || (isCustomCategory(currentCategory) ? [] : pools['白酒']);
 }
 
 // ===========================
+// Scoring Engine
+// ===========================// ===========================
 // Scoring Engine
 // ===========================
 function scoreProduct(config, product) {
@@ -1552,97 +1399,16 @@ function generateDetailHTML(config, product) {
 // ===========================
 // Actions
 // ===========================
-// 智能洗牌：Fisher-Yates，每次打乱都不同
-function smartShuffle(arr) {
-  const a = [...arr];
-  for (let i = a.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [a[i], a[j]] = [a[j], a[i]];
-  }
-  return a;
-}
 
-function loadSampleResults() {
-  searchInProgress = false;
-  const config = getCategoryConfig(currentCategory);
-  const pool = getProductPool(config, '百度');
-
-  // Handle empty pool for custom categories
-  if (pool.length === 0) {
-    document.getElementById('resultsArea').innerHTML = `<div class="empty-state">
-      <div class="icon">📭</div>
-      <h3>「${config.name}」暂无内置产品数据</h3>
-      <p>自定义品类需要手动添加候选产品，或使用实时搜索从网上获取真实数据。</p>
-      <div style="margin-top:16px;display:flex;gap:8px;justify-content:center;">
-        <button class="btn btn-primary" onclick="showManualAdd()">✚ 手动添加产品</button>
-      </div>
-      <p style="font-size:11px;color:var(--text-light);margin-top:12px;">💡 添加产品后，系统会按「${config.name}」的选品规则自动评分排序。</p>
-    </div>`;
-    document.getElementById('statsBar').style.display = 'none';
-    document.getElementById('searchProgress').style.display = 'none';
-    document.getElementById('engineStatus').textContent = `「${config.name}」· 暂无内置产品 · 请手动添加`;
-    return;
-  }
-
-  // Step 1: Filter by user parameters
-  const originPref = document.getElementById('originPref').value.trim().toLowerCase();
-  const platformCount = parseInt(document.getElementById('platformCount').value);
-
-  let filtered = pool.filter(p => {
-    // Filter by origin preference
-    if (originPref && !p.origin.toLowerCase().includes(originPref) && !p.name.includes(originPref)) return false;
-    return true;
-  });
-
-  // Step 2: Smart shuffle — each search produces different ordering
-  filtered = smartShuffle(filtered);
-
-  // Step 3: Take N results based on platform count (more platforms = more results)
-  const resultCount = Math.min(platformCount * 3 + 3, filtered.length);
-
-  // Step 4: Score and build results
-  searchResults = filtered.slice(0, resultCount).map(product => {
-    const scores = scoreProduct(config, product);
-    return {
-      ...product,
-      platform: ['抖音', '快手', '小红书', '京东', '淘宝', '1688', '百度'][Math.floor(Math.random() * 7)],
-      scores,
-      total: scores.reduce((sum, s) => sum + s.weighted, 0),
-    };
-  });
-
-  searchResults.sort((a, b) => b.total - a.total);
-
-  const passLine = getCustomPassLine(config);
-  const highLine = getCustomHighLine(config);
-  const highCount = searchResults.filter(r => r.total >= highLine).length;
-  const midCount = searchResults.filter(r => r.total >= passLine && r.total < highLine).length;
-  const lowCount = searchResults.filter(r => r.total < passLine).length;
-
-  document.getElementById('statTotal').textContent = searchResults.length;
-  document.getElementById('statHigh').textContent = highCount;
-  document.getElementById('statMid').textContent = midCount;
-  document.getElementById('statLow').textContent = lowCount;
-  document.getElementById('statsBar').style.display = 'grid';
-  document.getElementById('searchProgress').style.display = 'none';
-
-  renderResults(config);
-  const changedMsg = originPref ? `（已筛选产地:"${originPref}"）` : '';
-  document.getElementById('engineStatus').textContent =
-    `搜索结果：${searchResults.length}个候选 · ${highCount}个推荐 · 每次结果不同 ${changedMsg}`;
-  showToast(`✅ 从${pool.length}款产品池中筛选出${searchResults.length}个候选 · 含${highCount}个高分推荐`);
-}
 
 function resetSearch() {
   searchResults = [];
   const config = getCategoryConfig(currentCategory);
-  const isCustom = isCustomCategory(currentCategory);
   document.getElementById('resultsArea').innerHTML = `<div class="empty-state">
     <div class="icon">🔍</div>
     <h3>选择品类，启动全网选品搜索</h3>
-    <p>AI搜索引擎将根据品类配置规则，从多个平台搜索候选产品</p>
-    ${isCustom ? `<p style="margin-top:12px;padding:10px 16px;background:#fff8e1;border-radius:8px;display:inline-block;font-size:12px;color:#8d6e00;">💡 「${config.name}」是自定义品类，无内置产品。请先<strong>手动添加产品</strong>或使用<strong>实时搜索</strong>获取数据。</p>` : ''}
-    <p style="font-size:12px;color:var(--text-light);margin-top:8px;">自动按选品维度评分排序，${config.passLine}分以上进入候选</p></div>`;
+    <p>AI搜索引擎将从多个电商平台实时搜索候选产品，按选品规则评分排序</p>
+    <p style="font-size:12px;color:var(--text-light);margin-top:8px;">${config.passLine}分以上进入推荐，支持手动添加产品补充候选池</p></div>`;
   document.getElementById('statsBar').style.display = 'none';
   document.getElementById('searchProgress').style.display = 'none';
   document.getElementById('engineStatus').textContent = '选择品类，启动全网选品搜索';
@@ -1775,10 +1541,10 @@ function checkBridgeStatus() {
       }
     })
     .catch(() => {
-      badge.textContent = '⚡离线模式';
+      badge.textContent = '⚡未连接';
       badge.style.background = '#fef2f2';
       badge.style.color = '#dc2626';
-      badge.title = '桥接服务未连接 — 搜索将使用内置示例数据';
+      badge.title = '桥接服务未连接 — 请启动 node bridge-server.js 以使用全网实时搜索';
       document.getElementById('statusDot').style.background = '#999';
     });
 }

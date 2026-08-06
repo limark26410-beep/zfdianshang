@@ -163,8 +163,17 @@ const server = http.createServer((req, res) => {
     let body = '';
     req.on('data', chunk => body += chunk);
     req.on('end', async () => {
-      const params = JSON.parse(body || '{}');
-      const id = genId();
+      let params, id;
+      try {
+        params = JSON.parse(body || '{}');
+        id = genId();
+        console.log(`[bridge:auto] 📩 收到请求: id=${id} category=${params.category} keywords=${(params.searchKeywords||[]).slice(0,2).join(',')}`);
+      } catch (parseErr) {
+        console.error('[bridge:auto] 请求解析失败:', parseErr.message);
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ success: false, error: 'Invalid JSON' }));
+        return;
+      }
       
       // Respond immediately with request ID
       res.writeHead(200, { 'Content-Type': 'application/json' });
@@ -174,14 +183,18 @@ const server = http.createServer((req, res) => {
       console.log(`[bridge:auto] 🚀 开始自主搜索: ${params.category} | 关键词: ${(params.searchKeywords || []).slice(0, 3).join(', ')}`);
       
       try {
-        const result = await autoSearch(
-          params.categoryName || params.category,
-          params.searchKeywords || [],
-          params.originPref || '',
-          params.priceFilter?.min || 0,
-          params.priceFilter?.max || 9999,
-          params.platforms?.length || 5
-        );
+        // 使用 Promise.race 防止长时间卡死
+        const result = await Promise.race([
+          autoSearch(
+            params.categoryName || params.category,
+            params.searchKeywords || [],
+            params.originPref || '',
+            params.priceFilter?.min || 0,
+            params.priceFilter?.max || 9999,
+            params.platforms?.length || 5
+          ),
+          new Promise((_, reject) => setTimeout(() => reject(new Error('搜索全局超时(60s)')), 60000))
+        ]);
         
         // Write results
         const resultFile = path.join(RESULTS_DIR, `${id}.json`);
@@ -427,6 +440,14 @@ async function autoSearch(categoryName, keywords, originPref, priceMin, priceMax
 }
 
 // ============= 服务启动 =============
+
+// 全局错误处理，防止服务因单个搜索异常而崩溃
+process.on('uncaughtException', (err) => {
+  console.error('[bridge] ❌ 未捕获异常:', err.message, err.stack?.split('\n')[1]?.trim());
+});
+process.on('unhandledRejection', (reason) => {
+  console.error('[bridge] ❌ 未处理的Promise拒绝:', reason);
+});
 
 server.listen(PORT, '127.0.0.1', () => {
   console.log(`==============================================`);
