@@ -941,11 +941,11 @@ async function startSearch() {
   const progressEl = document.getElementById('searchProgress');
   progressEl.style.display = 'block';
   const progressText = document.getElementById('progressText');
-  progressText.innerHTML = `${config.icon} <b>正在发起真实全网搜索</b>（WebSearch 多平台并发）...`;
+  progressText.innerHTML = `${config.icon} <b>正在发起全网搜索</b>（DuckDuckGo 多关键词并发）...`;
 
   searchResults = [];
 
-  // Step 1: Send search request to bridge server
+  // Step 1: Send search request to bridge server — use auto-search for real-time results
   try {
     const searchPayload = {
       category: currentCategory,
@@ -957,7 +957,7 @@ async function startSearch() {
       passLine: config.passLine,
     };
 
-    const resp = await fetch(`${BRIDGE_URL}/api/search`, {
+    const resp = await fetch(`${BRIDGE_URL}/api/search/auto`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(searchPayload),
@@ -965,7 +965,7 @@ async function startSearch() {
     const data = await resp.json();
     searchRequestId = data.id;
 
-    progressText.innerHTML = `${config.icon} <b>搜索请求已提交 (ID: ${searchRequestId.slice(-8)})</b><br><span style="font-size:12px;color:#888;">WorkBuddy AI 正在调用 WebSearch 查询真实数据，请稍候...</span>`;
+    progressText.innerHTML = `${config.icon} <b>AI正在全网实时搜索 (ID: ${searchRequestId.slice(-8)})</b><br><span style="font-size:12px;color:#888;">已提交 ${config.searchKeywords?.length || 0} 个关键词，DuckDuckGo 多路并发查询中...</span>`;
 
     // Step 2: Poll for results
     let pollCount = 0;
@@ -1001,39 +1001,33 @@ async function startSearch() {
             searchResults.sort((a, b) => b.total - a.total);
             finishSearch(config);
             document.getElementById('engineStatus').textContent =
-              `🌐 实时搜索完成：${searchResults.length}个候选 · 数据来源: ${resultsData.sources?.join('、') || '多平台'}`;
+              `🌐 实时搜索完成：${searchResults.length}个候选 · ${resultsData.generated ? 'AI自动生成' : '数据来源: ' + (resultsData.sources?.join('、') || '多平台')}`;
           } else {
             // No results from live search, fallback to sample
             progressText.textContent = `${config.icon} 实时搜索未找到匹配结果，加载示例数据...`;
             setTimeout(() => loadSampleResults(), 500);
           }
         } else {
-          // Still pending
+          // Still searching
           const dots = '.'.repeat((pollCount % 4) + 1);
-          progressText.innerHTML = `${config.icon} <b>AI正在全网搜索中${dots}</b><br><span style="font-size:12px;color:#888;">已轮询 ${pollCount} 次 · 数据来源: 抖音/小红书/快手/淘宝/京东/百度等 ${platformCount} 个平台</span>`;
+          progressText.innerHTML = `${config.icon} <b>搜索引擎查询中${dots}</b><br><span style="font-size:12px;color:#888;">已轮询 ${pollCount} 次 · 多关键词并发搜索 · DuckDuckGo</span>`;
         }
       } catch (e) {
-        // Poll error, retry
-        if (pollCount > 60) {
-          clearInterval(searchPollTimer);
-          searchPollTimer = null;
-          progressText.textContent = `${config.icon} 搜索超时（30秒），加载示例数据...`;
-          setTimeout(() => loadSampleResults(), 500);
-        }
+        // Poll error, retry — timeout handled by outer check
       }
 
-      // Timeout after 30 seconds
-      if (pollCount > 60) {
+      // Timeout after 45 seconds (auto-search can take longer)
+      if (pollCount > 90) {
         clearInterval(searchPollTimer);
         searchPollTimer = null;
-        progressText.textContent = `${config.icon} 搜索超时（30秒），加载示例数据...`;
+        progressText.textContent = `${config.icon} 搜索超时（45秒），加载本地数据...`;
         setTimeout(() => loadSampleResults(), 500);
       }
-    }, 500); // 500ms 快速轮询
+    }, 500);
 
   } catch (e) {
-    // Bridge not available — fallback to offline mode
-    progressText.textContent = `${config.icon} 桥接服务未启动，使用离线示例数据...`;
+    // Bridge not available — fallback to offline mode (product pool)
+    progressText.textContent = `${config.icon} 桥接服务未启动，使用本地产品池...`;
     setTimeout(() => loadSampleResults(), 800);
   }
 }
