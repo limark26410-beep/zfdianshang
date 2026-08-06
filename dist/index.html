@@ -1561,6 +1561,23 @@ function loadSampleResults() {
   const config = getCategoryConfig(currentCategory);
   const pool = getProductPool(config, '百度');
 
+  // Handle empty pool for custom categories
+  if (pool.length === 0) {
+    document.getElementById('resultsArea').innerHTML = `<div class="empty-state">
+      <div class="icon">📭</div>
+      <h3>「${config.name}」暂无内置产品数据</h3>
+      <p>自定义品类需要手动添加候选产品，或使用实时搜索从网上获取真实数据。</p>
+      <div style="margin-top:16px;display:flex;gap:8px;justify-content:center;">
+        <button class="btn btn-primary" onclick="showManualAdd()">✚ 手动添加产品</button>
+      </div>
+      <p style="font-size:11px;color:var(--text-light);margin-top:12px;">💡 添加产品后，系统会按「${config.name}」的选品规则自动评分排序。</p>
+    </div>`;
+    document.getElementById('statsBar').style.display = 'none';
+    document.getElementById('searchProgress').style.display = 'none';
+    document.getElementById('engineStatus').textContent = `「${config.name}」· 暂无内置产品 · 请手动添加`;
+    return;
+  }
+
   // Step 1: Filter by user parameters
   const originPref = document.getElementById('originPref').value.trim().toLowerCase();
   const platformCount = parseInt(document.getElementById('platformCount').value);
@@ -1612,7 +1629,14 @@ function loadSampleResults() {
 
 function resetSearch() {
   searchResults = [];
-  document.getElementById('resultsArea').innerHTML = `<div class="empty-state"><div class="icon">🔍</div><h3>选择品类，启动全网选品搜索</h3><p>AI搜索引擎将根据品类配置规则，从多个平台搜索候选产品</p><p style="font-size:12px;color:var(--text-light);margin-top:8px;">自动按选品维度评分排序，${getCategoryConfig(currentCategory).passLine}分以上进入候选</p></div>`;
+  const config = getCategoryConfig(currentCategory);
+  const isCustom = isCustomCategory(currentCategory);
+  document.getElementById('resultsArea').innerHTML = `<div class="empty-state">
+    <div class="icon">🔍</div>
+    <h3>选择品类，启动全网选品搜索</h3>
+    <p>AI搜索引擎将根据品类配置规则，从多个平台搜索候选产品</p>
+    ${isCustom ? `<p style="margin-top:12px;padding:10px 16px;background:#fff8e1;border-radius:8px;display:inline-block;font-size:12px;color:#8d6e00;">💡 「${config.name}」是自定义品类，无内置产品。请先<strong>手动添加产品</strong>或使用<strong>实时搜索</strong>获取数据。</p>` : ''}
+    <p style="font-size:12px;color:var(--text-light);margin-top:8px;">自动按选品维度评分排序，${config.passLine}分以上进入候选</p></div>`;
   document.getElementById('statsBar').style.display = 'none';
   document.getElementById('searchProgress').style.display = 'none';
   document.getElementById('engineStatus').textContent = '选择品类，启动全网选品搜索';
