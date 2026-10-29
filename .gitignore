@@ -3,3 +3,6 @@ search-requests/
 search-results/
 .DS_Store
 *.log
+
+# 环境变量（含密钥，勿提交）
+.env

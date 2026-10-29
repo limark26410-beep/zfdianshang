@@ -1,0 +1,11 @@
+node_modules
+search-requests
+search-results
+dist
+.git
+.gitignore
+*.md
+.DS_Store
+docker-compose.yml
+Dockerfile
+.dockerignore

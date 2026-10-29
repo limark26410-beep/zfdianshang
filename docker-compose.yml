@@ -1,0 +1,63 @@
+services:
+  # ========== SearXNG 自托管搜索引擎（免费、无需API Key） ==========
+  searxng:
+    image: searxng/searxng:latest
+    container_name: sourcing-searxng
+    ports:
+      - "8182:8080"
+    volumes:
+      - ./searxng/settings.yml:/etc/searxng/settings.yml:ro
+      - searxng-data:/etc/searxng
+    environment:
+      - SEARXNG_BASE_URL=http://localhost:8182/
+    restart: unless-stopped
+    networks:
+      - search-net
+
+  # ========== Redis（SearXNG 依赖） ==========
+  redis:
+    image: valkey/valkey:8-alpine
+    container_name: sourcing-redis
+    command: valkey-server --save 60 1 --loglevel warning
+    volumes:
+      - redis-data:/data
+    restart: unless-stopped
+    networks:
+      - search-net
+
+  # ========== 六步法选品引擎 v1.4 — 1688产品数据 + SearXNG口碑 + LLM分析 ==========
+  search-engine:
+    build: .
+    container_name: ai-sourcing-engine
+    ports:
+      - "3456:3456"
+    volumes:
+      - ./search-requests:/app/search-requests
+      - ./search-results:/app/search-results
+      - ../品类配置:/app/品类配置:ro
+    environment:
+      - NODE_ENV=production
+      - SEARXNG_URL=http://searxng:8080
+      # ───────── 1688 产品搜索（LinkFox） ─────────
+      # 配置后可直接获取1688真实产品：品牌/价格/产地/销量/供应商链接
+      # 获取 Key: WorkBuddy → 设置 → 连接器 → LinkFox选品 → 复制API Key
+      - LINKFOX_AGENT_API_KEY=${LINKFOX_AGENT_API_KEY:-}
+      # ───────── LLM 多模型配置 ─────────
+      # 优先级：GLM（免费） > DeepSeek（低价） > Qwen（备选）
+      - GLM_API_KEY=${GLM_API_KEY:-}
+      - DEEPSEEK_API_KEY=${DEEPSEEK_API_KEY:-}
+      - QWEN_API_KEY=${QWEN_API_KEY:-}
+    restart: unless-stopped
+    depends_on:
+      - searxng
+      - redis
+    networks:
+      - search-net
+
+volumes:
+  searxng-data:
+  redis-data:
+
+networks:
+  search-net:
+    driver: bridge

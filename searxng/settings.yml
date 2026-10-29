@@ -1,0 +1,36 @@
+# SearXNG 配置 — 六步法选品搜索引擎
+use_default_settings: true
+
+general:
+  instance_name: "六步法选品搜索"
+  debug: false
+
+search:
+  safe_search: 0
+  formats:
+    - html
+    - json  # ★ 必须开启 JSON API
+  results_per_page: 15
+  # 只用稳定可靠的搜索引擎，避免 Google CAPTCHA 导致 500
+  engines:
+    - duckduckgo
+    - bing
+    - brave
+    - startpage
+    - qwant
+
+server:
+  secret_key: "liubufa-sourcing-search-2026-searxng-key"
+  limiter: false  # 内部调用，关闭限速
+  image_proxy: false
+  bind_address: "0.0.0.0"
+  port: 8080
+
+ui:
+  default_theme: simple
+
+outgoing:
+  request_timeout: 8.0
+  max_request_timeout: 12.0
+  pool_connections: 10
+  pool_maxsize: 5

@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>AI六步法 · 选品搜索引擎 v0.6 · 智能筛选</title>
+<title>AI六步法 · 选品搜索引擎 v1.1 · SearXNG自托管</title>
 <style>
 :root {
   --bg: #f5f5f0;
@@ -940,7 +940,7 @@ async function startSearch() {
   const progressEl = document.getElementById('searchProgress');
   progressEl.style.display = 'block';
   const progressText = document.getElementById('progressText');
-  progressText.innerHTML = `${config.icon} <b>正在发起全网搜索</b>（DuckDuckGo 多关键词并发）...`;
+  progressText.innerHTML = `${config.icon} <b>正在发起全网搜索</b>（SearXNG + DeepSeek 智能增强）...`;
 
   searchResults = [];
 
@@ -964,7 +964,13 @@ async function startSearch() {
     const data = await resp.json();
     searchRequestId = data.id;
 
-    progressText.innerHTML = `${config.icon} <b>AI正在全网实时搜索 (ID: ${searchRequestId.slice(-8)})</b><br><span style="font-size:12px;color:#888;">已提交 ${config.searchKeywords?.length || 0} 个关键词，DuckDuckGo 多路并发查询中...</span>`;
+    const em2 = data.engineMode || 'searxng';
+    const llmPart = em2.includes('glm') ? 'GLM-4.7-Flash' : (em2.includes('deepseek') ? 'DeepSeek' : (em2.includes('qwen') ? 'Qwen3-Plus' : ''));
+    const engineLabel2 = llmPart ? `SearXNG + ${llmPart} 增强` : 'SearXNG 自托管';
+    const stepText = llmPart
+      ? `第1步: ${llmPart} 优化搜索词 → 第2步: SearXNG 全网搜索 → 第3步: ${llmPart} 智能提取`
+      : '已提交关键词，并发搜索 + 正则提取中...';
+    progressText.innerHTML = `${config.icon} <b>🔍 ${engineLabel2} 搜索中 (ID: ${searchRequestId.slice(-8)})</b><br><span style="font-size:12px;color:#888;">${stepText}</span>`;
 
     // Step 2: Poll for results
     let pollCount = 0;
@@ -983,7 +989,7 @@ async function startSearch() {
           const resultsData = await resultsResp.json();
 
           if (resultsData.products && resultsData.products.length > 0) {
-            // Enrich products with defaults for missing fields (DuckDuckGo results lack cost/desc/sales/star)
+            // Enrich products with defaults for missing fields
             const enriched = resultsData.products.map(p => ({
               ...p,
               cost: p.cost || Math.round((p.price || 50) * 0.4),
@@ -1009,8 +1015,12 @@ async function startSearch() {
             // Sort by score descending
             searchResults.sort((a, b) => b.total - a.total);
             finishSearch(config);
+            const em = resultsData.engineMode || 'search';
+            const llmId = em.split('+')[1] || '';
+            const llmLabel = llmId === 'glm' ? 'GLM 智能提取' : (llmId === 'deepseek' ? 'DeepSeek 智能提取' : (llmId === 'qwen' ? 'Qwen 智能提取' : ''));
+            const emLabel = llmLabel ? `🤖 SearXNG + ${llmLabel}` : (em.includes('basic') ? '🔍 SearXNG 基础模式' : '🔍 SearXNG');
             document.getElementById('engineStatus').textContent =
-              `🌐 实时搜索完成：${searchResults.length}个候选 · ${resultsData.generated ? 'AI自动生成' : '数据来源: ' + (resultsData.sources?.join('、') || '多平台')}`;
+              `${resultsData.generated ? emLabel : emLabel + ' · ' + searchResults.length + '个候选 · ' + (resultsData.sources?.slice(0,3).join('、') || '多平台')}`;
           } else {
             // No results from live search — honest empty state
             progressEl.style.display = 'none';
@@ -1028,24 +1038,24 @@ async function startSearch() {
             document.getElementById('engineStatus').textContent = `「${config.name}」· 全网未搜索到匹配产品`;
           }
         } else {
-          // Still searching
+          // Still searching - waiting for agent to process
           const dots = '.'.repeat((pollCount % 4) + 1);
-          progressText.innerHTML = `${config.icon} <b>搜索引擎查询中${dots}</b><br><span style="font-size:12px;color:#888;">已轮询 ${pollCount} 次 · 多关键词并发搜索 · DuckDuckGo</span>`;
+          progressText.innerHTML = `${config.icon} <b>全网搜索中${dots}</b><br><span style="font-size:12px;color:#888;">已运行 ${pollCount} 秒 · SearXNG + DeepSeek 智能提取</span>`;
         }
       } catch (e) {
         // Poll error, retry — timeout handled by outer check
       }
 
-      // Timeout after 45 seconds (auto-search can take longer)
-      if (pollCount > 90) {
+      // Timeout after 120 seconds
+      if (pollCount > 120) {
         clearInterval(searchPollTimer);
         searchPollTimer = null;
         progressEl.style.display = 'none';
         searchInProgress = false;
         document.getElementById('resultsArea').innerHTML = `<div class="empty-state">
           <div class="icon">⏱️</div>
-          <h3>搜索超时（45秒）</h3>
-          <p>当前网络环境较慢或关键词覆盖太广，建议缩减关键词数量后重试。</p>
+          <h3>搜索超时（2分钟）</h3>
+          <p>当前网络较慢或搜索引擎响应异常，建议缩减关键词后重试。</p>
           <div style="margin-top:12px;">
             <button class="btn btn-primary" onclick="startSearch()">🔄 重新搜索</button>
           </div>
@@ -1069,7 +1079,7 @@ async function startSearch() {
       </div>
     </div>`;
     document.getElementById('statsBar').style.display = 'none';
-    document.getElementById('engineStatus').textContent = '桥接服务未启动 — 请先启动 node bridge-server.js';
+    document.getElementById('engineStatus').textContent = '服务未启动 — 运行 docker compose up -d · 配置 GLM_API_KEY（免费）启用增强模式';
   }
 }
 
@@ -1201,20 +1211,47 @@ function renderResults(config) {
     const stars = total >= 90 ? '⭐⭐⭐⭐⭐' : total >= 80 ? '⭐⭐⭐⭐☆' : total >= 70 ? '⭐⭐⭐☆☆' : total >= 60 ? '⭐⭐☆☆☆' : '⭐☆☆☆☆';
     const margin = ((product.price - product.cost) / product.price * 100).toFixed(0);
 
+    // 数据质量标记
+    const qualityBadges = {
+      'scraped': '<span style="background:#dcfce7;color:#15803d;padding:1px 6px;border-radius:3px;font-size:10px;font-weight:700;">📄 真实抓取</span>',
+      'snippet': '<span style="background:#fef3c7;color:#92400e;padding:1px 6px;border-radius:3px;font-size:10px;">📋 搜索摘要</span>',
+      'generated': '<span style="background:#f3e8ff;color:#7e22ce;padding:1px 6px;border-radius:3px;font-size:10px;">🤖 AI生成</span>',
+    };
+    const qualityBadge = qualityBadges[product.dataQuality] || '';
+
     html += `
     <div class="${cardClass}" id="product-${idx}">
       <div class="product-card-header" onclick="toggleDetail(${idx})">
         <div class="product-rank">#${rank}</div>
         <div class="product-info">
-          <div class="product-name">${config.icon} ${product.name}</div>
+          <div class="product-name">
+            ${config.icon} ${product.fullName || product.name}
+            ${qualityBadge}
+          </div>
           <div class="product-meta">
-            <span>🏷️ ${product.brand}</span>
-            <span>📦 ${product.spec}</span>
+            <span>🏷️ ${product.brand || '未知品牌'}</span>
+            <span>📦 ${product.spec || '规格未提取'}</span>
             <span>💰 ¥${product.price}</span>
+            ${product.craft ? `<span>🏺 ${product.craft}</span>` : ''}
+            ${product.style ? `<span>🍶 ${product.style}</span>` : ''}
             <span>📈 毛利${margin}%</span>
             <span>📍 ${product.origin}</span>
+            ${product.score ? `<span style="color:var(--accent)">📊 专业评分${product.score}</span>` : ''}
             <span style="color:var(--warning)">⭐ ${product.star}</span>
           </div>
+          ${product.useCase ? `
+          <div style="margin-top:3px;font-size:11px;color:var(--accent);">
+            🎯 适用: ${product.useCase}
+          </div>` : ''}
+          ${(product.shopName && product.shopName !== product.platform) ? `
+          <div style="margin-top:3px;font-size:11px;color:var(--text-light);">
+            🏪 店铺: ${product.shopName}
+            ${product.supplierName ? ' | 🏭 供应商: ' + product.supplierName : ''}
+          </div>` : ''}
+          ${product.url ? `
+          <div style="margin-top:2px;font-size:10px;color:var(--text-lighter);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:400px;">
+            🔗 <a href="${product.url}" target="_blank" style="color:var(--accent);text-decoration:none;" onclick="event.stopPropagation()">${product.url.substring(0,60)}...</a>
+          </div>` : ''}
           <div style="margin-top:4px;display:flex;gap:6px;flex-wrap:wrap;">
             ${product.scores.map(s => {
               const badgeClass = s.score >= 80 ? 'a' : s.score >= 65 ? 'b' : s.score >= 50 ? 'c' : 'd';
@@ -1326,9 +1363,19 @@ function generateDetailHTML(config, product) {
       <div class="mini-step">
         <h5>🔍 市场调查</h5>
         <p><strong>来源平台：</strong>${product.platform} · ${product.source}</p>
+        <p><strong>数据质量：</strong>${product.dataQuality === 'scraped' ? '📄 真实页面抓取' : product.dataQuality === 'snippet' ? '📋 搜索摘要提取' : '🤖 AI自动生成'}</p>
+        ${product.url ? `<p><strong>数据来源URL：</strong><a href="${product.url}" target="_blank" style="color:var(--accent);word-break:break-all;">${product.url}</a></p>` : ''}
         <p><strong>评价：</strong>⭐${product.star} · 月销约${product.sales}+</p>
         <p><strong>用户画像：</strong>${config.targetUsers}</p>
         <p><strong>竞品参考：</strong>同品类${config.name}中价格带${product.price}元</p>
+        ${product.supplierName ? `
+        <div style="margin-top:8px;padding:8px 12px;background:var(--bg-card);border-radius:6px;border-left:3px solid var(--accent);">
+          <p><strong>🏭 供应链信息：</strong></p>
+          <p>供货方：${product.supplierName}</p>
+          ${product.moq ? `<p>起批量：${product.moq}件</p>` : ''}
+          ${product.shopName ? `<p>店铺：${product.shopName}</p>` : ''}
+          <p style="color:var(--text-light);font-size:12px;">💡 建议通过1688或企查查进一步核实供应商资质</p>
+        </div>` : ''}
         <p style="margin-top:4px;"><strong>建议搜索：</strong></p>
         <ul>
           <li>${product.name} 怎么样 评价</li>
